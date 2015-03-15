@@ -12,9 +12,6 @@
 # Packrat files
 packrat/lib*/
 
-# LaTex files
-report/tex/
-
 # temp file for schedulr code from schedulr GitHub repository
 code.r
 
