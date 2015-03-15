@@ -1,0 +1,86 @@
+---
+layout: default
+title: default
+output: bookdown::html_chapter
+bibliography: biblio.bib
+---
+
+# Introduction
+
+This is the introduction
+
+## Section 1
+
+This is intro - section 1
+
+## Section 2
+
+This is intro - section 2
+
+This is a reference to [@a778431]
+
+
+# Single Processor case
+
+## Methods
+Methods
+
+## Results
+Results
+
+## Discussion
+Discussion
+
+
+# Multiple Processor case
+
+## Methods
+Methods
+
+## Results
+Results
+
+## Discussion
+Discussion
+
+
+# Conclusions and future work
+
+## Conclusions
+
+This is the conclusion
+
+## Future work
+
+This is future work to be done
+
+### Extension to Spot instances
+Currently, cost = runtime (hrs) x cost (\$/hr).
+Cost is assumed to be fixed while runtime is variable.
+Spot instances are much cheaper by their cost is variable.
+This introduced additional level of uncertainty into the model.
+Cost for Spot instances is given as time series data generated from an unknown model.
+Need to model the cost effectively and pick a maximum bid price such that the job is not interrupted because the current Spot price exceeds the max bid price.
+Can extend this further by using a low bid price with checkpointing and re-processing the task that was interrupted and processing all remaining tasks
+Need to consider the possibility that might not get a Spot instance and will have to use an On Demand instance instead for the remaining tasks.
+
+### Variance of runtimes & trainingset sample sizes
+Currently using a fixed number of samples for each task size.
+It is possible that different task sizes will have different number of training set samples.
+Runtimes for task sizes with large number of training set samples will have lower variance that runtimes for sizes with fewer number of samples.
+Also, the same task size can have different number of samples for different instances types.
+Similarly, runtimes for a size on an instance with a large number of samples will have lower variance than runtimes for the same size on other instances with fewer number of samples.
+Can choose to run task on instance type with fewer number of samples in case it turns out to faster than an instance type with more samples.
+Possible use of multi-armed bandits to balance explore vs. exploit here since runtimes for current set of tasks will be added to training set for tasks from the next job.
+
+### Move bootstrap code from R to C++
+All code is currently in R and can take several minutes to run depending on the number of instances and tasks.
+Move the bootstrap code to C++ and call from R via RCpp to improve runtimes.
+
+### Skip runtime estimation for cluster sizes that are very unlikely to complete the tasks by the deadline
+When trying to determine the minimum number of instances in a cluster of a certain instance type that will complete the job by the deadline, we should ignore clusters with too few instances and focus only on cluster sizes that have a reasonable chance of completing the job by the deadline.
+Use the min values in the training set for each size and see if the cluster is able to complete them by the deadline.
+If not, move on to the next size.
+
+
+# Bibliography

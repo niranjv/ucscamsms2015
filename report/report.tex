@@ -1,0 +1,130 @@
+\documentclass[12pt]{report}
+\usepackage{ graphicx, setspace, psfrag }
+\usepackage{amssymb,amsmath}
+\usepackage{emptypage}
+
+% Taken from pandoc x.md -o test.tex --standalone
+% Coloring below is based on the One Light syntax theme in Atom text editor (atom.io)
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+\newenvironment{Shaded}{}{}
+\newcommand{\KeywordTok} [1]{\textcolor[RGB]{77,107,200}{{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[RGB]{0.56,0.13,0.00}{{#1}}}
+\newcommand{\DecValTok}  [1]{\textcolor[RGB]{182,86,17}{{#1}}}
+\newcommand{\BaseNTok}   [1]{\textcolor[RGB]{0.25,0.63,0.44}{{#1}}}
+\newcommand{\FloatTok}   [1]{\textcolor[RGB]{182,86,17}{{#1}}}
+\newcommand{\CharTok}    [1]{\textcolor[RGB]{96,172,57}{{#1}}}
+\newcommand{\StringTok}  [1]{\textcolor[RGB]{96,172,57}{{#1}}}
+\newcommand{\CommentTok} [1]{\textcolor[RGB]{166,162,140}{{#1}}}
+\newcommand{\OtherTok}   [1]{\textcolor[RGB]{0.00,0.44,0.13}{{#1}}}
+\newcommand{\AlertTok}   [1]{\textcolor[RGB]{1.00,0.00,0.00}{{#1}}}
+\newcommand{\FunctionTok}[1]{\textcolor[RGB]{0.02,0.16,0.49}{{#1}}}
+\newcommand{\ErrorTok}   [1]{\textcolor[RGB]{1.00,0.00,0.00}{{#1}}}
+\newcommand{\NormalTok}  [1]{{#1}}
+
+
+\setlength{\textwidth}{6.15in}
+\setlength{\textheight}{8.5in}
+\addtolength{\oddsidemargin}{-0.25in}
+\addtolength{\topmargin}{-0.5in}
+\doublespacing
+\raggedbottom
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+
+\textsc{\Large University of California \\
+Santa Cruz } \\
+\vspace*{0.15in}
+
+\textsc{\Large \textbf{Optimal scheduling for tasks \\
+with stochastic runtimes}}
+\vspace*{0.15in}
+
+\large
+A project submitted in partial satisfaction \vspace*{-0.1in} \\
+of the requirements for the degree of \\
+\vspace*{0.15in}
+
+\textsc{\Large Master of Science} \\
+\large in \\
+
+\textsc{\Large Statistics and Applied Mathematics} \\
+\large by \\
+\vspace*{0.15in}
+
+\textbf{Niranjan Vissa} \\
+\vspace*{0.15in}
+
+June 2015
+\large
+\vspace*{0.15in}
+
+\begin{flushright}
+
+The Project of Niranjan Vissa \\
+is approved:
+\vspace*{-0.1in}
+\vspace*{0.2in}
+
+\rule{2.5in}{.01cm}
+
+Professor David Draper
+
+\vspace*{0.2in}
+
+\rule{2.5in}{.01cm}
+
+2nd person
+
+\end{flushright}
+
+\end{center}
+\end{titlepage}
+
+
+\pagenumbering{roman}
+
+\setcounter{page}{2}
+
+\newpage
+
+\mbox{}
+
+\newpage
+
+\singlespacing
+
+\tableofcontents
+
+\setcounter{tocdepth}{2}
+
+\listoftables
+
+\listoffigures
+
+\newpage
+\begin{center} \textbf{\large ACKNOWLEDGMENTS} \end{center}
+\bigskip
+\noindent
+This master's project could not have been written without the help of
+Prof.~David Draper who gave me the guidance,
+encouragement, and expertise needed for the advancement of my education.
+
+\newpage
+\pagenumbering{arabic}
+
+\include{contents}
+
+\newpage
+\printbibliography
+
+\appendix
+\include{appendix}
+
+\end{document}

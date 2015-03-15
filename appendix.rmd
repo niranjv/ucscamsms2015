@@ -1,0 +1,20 @@
+---
+layout: default
+title: default
+output: bookdown::html_chapter
+bibliography: biblio.bib
+---
+
+# Code for schedulr R package
+
+This is the code for the schedulr R package
+
+```{r echo=FALSE, eval=TRUE}
+
+  library(knitr)
+  read_chunk(path='simulated-annealing.r', labels=c('all'))
+```
+
+```{r eval=FALSE}
+  <<all>>
+```

@@ -1,0 +1,5 @@
+name: R packages
+markdown: redcarpet
+highlighter: pygments
+
+exclude: ["README.md", "report"]
