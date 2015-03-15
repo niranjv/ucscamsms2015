@@ -17,7 +17,7 @@ This is the code for the schedulr R package
   filename <- 'code.r'
   if (file.exists(filename)) file.remove(filename)
 
-  curlPerform(url = "https://raw.githubusercontent.com/niranjv/schedulr/develop/R/simulated-annealing.r",
+  curlPerform(url = "https://raw.githubusercontent.com/niranjv/schedulr/develop/R/simulated-annealing.R",
               writefunction = function(txt, ...) {
                                    cat(txt, "\n", file=filename, append=T)
                                    return(TRUE)
