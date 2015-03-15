@@ -9,10 +9,21 @@ bibliography: biblio.bib
 
 This is the code for the schedulr R package
 
-```{r echo=FALSE, eval=TRUE}
+```{r echo=FALSE, eval=TRUE, include=FALSE}
 
+  library(RCurl)
   library(knitr)
-  read_chunk(path='simulated-annealing.r', labels=c('all'))
+
+  filename <- 'code.r'
+  if (file.exists(filename)) file.remove(filename)
+
+  curlPerform(url = "https://raw.githubusercontent.com/niranjv/schedulr/develop/R/simulated-annealing.r",
+              writefunction = function(txt, ...) {
+                                   cat(txt, "\n", file=filename, append=T)
+                                   return(TRUE)
+                              })
+
+  read_chunk(path=filename, labels=c('all'))
 ```
 
 ```{r eval=FALSE}
