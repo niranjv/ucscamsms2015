@@ -16,9 +16,6 @@ install:
 - chmod +x $HOME/pandoc/pandoc
 - pandoc --version
 
-# Install jekyll
-- travis_retry gem install jekyll mime-types
-
 # Install R packages
 - ./travis-tool.sh github_package   hadley/devtools
 - ./travis-tool.sh github_package   rstudio/rmarkdown
@@ -28,7 +25,7 @@ install:
 # - mkdir ~/.R
 # - cp Makevars ~/.R
 
-script: jekyll build
+script: Rscript  'report/build-report.r' 
 
 after_failure:
 - "./travis-tool.sh dump_logs"
