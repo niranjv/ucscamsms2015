@@ -17,14 +17,14 @@ install:
 - pandoc --version
 
 # Install jekyll
-  - travis_retry gem install jekyll mime-types
+- travis_retry gem install jekyll mime-types
 
 # Install R packages
-- "./travis-tool.sh github_package   hadley/devtools"
-- "./travis-tool.sh github_package   rstudio/rmarkdown"
-- "./travis-tool.sh github_package   hadley/bookdown"
-- "./travis-tool.sh r_binary_install knitr"
-- "./travis-tool.sh r_binary_install RCurl"
+- ./travis-tool.sh github_package   hadley/devtools
+- ./travis-tool.sh github_package   rstudio/rmarkdown
+- ./travis-tool.sh github_package   hadley/bookdown
+- ./travis-tool.sh r_binary_install knitr
+- ./travis-tool.sh r_binary_install RCurl
 # - mkdir ~/.R
 # - cp Makevars ~/.R
 
