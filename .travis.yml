@@ -1,10 +1,13 @@
 language: c
+
 env:
 - WARNINGS_ARE_ERRORS=1
+
 before_install:
 - curl -OL http://raw.github.com/craigcitro/r-travis/master/scripts/travis-tool.sh
 - chmod 755 ./travis-tool.sh
 - "./travis-tool.sh bootstrap"
+
 install:
 - mkdir $HOME/pandoc
 - export PATH="$HOME/pandoc:$PATH"
@@ -14,11 +17,14 @@ install:
 - pandoc --version
 - "./travis-tool.sh github_package   hadley/devtools"
 - "./travis-tool.sh github_package   rstudio/rmarkdown hadley/bookdown"
-- "./travis-tool.sh r_binary_install knitr RCurl"
+- "./travis-tool.sh r_binary_install knitr"
+- "./travis-tool.sh r_binary_install RCurl"
 - mkdir ~/.R
 - cp Makevars ~/.R
+
 after_failure:
 - "./travis-tool.sh dump_logs"
+
 deploy:
   provider: s3
   access_key_id: AKIAJXAGPD4HZ5IORX2Q
@@ -30,7 +36,8 @@ deploy:
   local_dir: report
   detect_encoding: true
   skip_cleanup: true
-  notifications:
+
+notifications:
   email:
     on_success: change
     on_failure: change
