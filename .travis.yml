@@ -1,31 +1,31 @@
-language: c
+language: r
 
 env:
 - WARNINGS_ARE_ERRORS=1
 
-before_install:
-- curl -OL http://raw.github.com/craigcitro/r-travis/master/scripts/travis-tool.sh
-- chmod 755 ./travis-tool.sh
-- "./travis-tool.sh bootstrap"
-
 install:
-- mkdir $HOME/pandoc
-- export PATH="$HOME/pandoc:$PATH"
-- curl -O https://s3.amazonaws.com/rstudio-buildtools/pandoc-1.12.3.zip
-- unzip -j pandoc-1.12.3.zip pandoc-1.12.3/linux/debian/x86_64/* -d $HOME/pandoc
-- chmod +x $HOME/pandoc/pandoc
-- pandoc --version
+  - sudo apt-get install texlive-xetex
 
-# Install R packages
-- ./travis-tool.sh github_package   hadley/devtools
-- ./travis-tool.sh github_package   rstudio/rmarkdown
-- ./travis-tool.sh github_package   hadley/bookdown
-- ./travis-tool.sh r_binary_install knitr
-- ./travis-tool.sh r_binary_install RCurl
-# - mkdir ~/.R
-# - cp Makevars ~/.R
+r_binary_packages:
+  - knitr
+  - RCurl
 
-script: Rscript  'report/build-report.r'
+r_github_packages:
+  - hadley/devtools
+  - rstudio/rmarkdown
+  - hadley/bookdown
+
+script:
+  - xelatex -version
+  - pandoc --version
+  - pandoc-citeproc --version
+
+  # Install inconsolata
+  - sudo apt-get install fonts-inconsolata
+  - sudo fc-cache -fv
+
+  # Create PDF file
+  - Rscript  'report/build-report.r'
 
 after_failure:
 - "./travis-tool.sh dump_logs"
