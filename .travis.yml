@@ -4,10 +4,10 @@ warnings_are_errors: true
 
 cran: http://cran.rstudio.com
 
-r-binary-packages:
+r_binary_packages:
   - RCurl
   - knitr
-r-github-packages:
+r_github_packages:
   - hadley/devtools
   - hadley/bookdown
   - rstudio/rmarkdown
