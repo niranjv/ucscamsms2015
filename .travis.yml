@@ -2,9 +2,6 @@ language: r
 
 warnings_are_errors: true
 
-install:
-  - sudo apt-get install texlive-xetex
-
 r_binary_packages:
   - RCurl
   - knitr
@@ -13,6 +10,9 @@ r_github_packages:
   - hadley/devtools
   - hadley/bookdown
   - rstudio/rmarkdown
+  
+install:
+  - sudo apt-get install texlive-xetex
 
 script:
   - xelatex -version
