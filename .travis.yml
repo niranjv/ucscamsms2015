@@ -12,7 +12,7 @@ install:
 - mkdir $HOME/pandoc
 - export PATH="$HOME/pandoc:$PATH"
 - curl -O https://s3.amazonaws.com/rstudio-buildtools/pandoc-1.12.3.zip
-- unzip -j pandoc-1.12.3.zip pandoc-1.12.3/linux/debian/x86_64/pandoc -d $HOME/pandoc
+- unzip -j pandoc-1.12.3.zip pandoc-1.12.3/linux/debian/x86_64/* -d $HOME/pandoc
 - chmod +x $HOME/pandoc/pandoc
 - pandoc --version
 
@@ -25,7 +25,7 @@ install:
 # - mkdir ~/.R
 # - cp Makevars ~/.R
 
-script: Rscript  'report/build-report.r' 
+script: Rscript  'report/build-report.r'
 
 after_failure:
 - "./travis-tool.sh dump_logs"
