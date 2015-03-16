@@ -1,19 +1,18 @@
 language: r
 
-env:
-- WARNINGS_ARE_ERRORS=1
+warnings_are_errors: true
 
 install:
   - sudo apt-get install texlive-xetex
 
 r_binary_packages:
-  - knitr
   - RCurl
+  - knitr
 
 r_github_packages:
   - hadley/devtools
-  - rstudio/rmarkdown
   - hadley/bookdown
+  - rstudio/rmarkdown
 
 script:
   - xelatex -version
@@ -26,9 +25,6 @@ script:
 
   # Create PDF file
   - Rscript  'report/build-report.r'
-
-after_failure:
-- "./travis-tool.sh dump_logs"
 
 deploy:
   provider: s3
