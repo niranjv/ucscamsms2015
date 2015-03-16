@@ -15,12 +15,19 @@ install:
 - unzip -j pandoc-1.12.3.zip pandoc-1.12.3/linux/debian/x86_64/pandoc -d $HOME/pandoc
 - chmod +x $HOME/pandoc/pandoc
 - pandoc --version
+
+# Install jekyll
+  - travis_retry gem install jekyll mime-types
+
+# Install R packages
 - "./travis-tool.sh github_package   hadley/devtools"
 - "./travis-tool.sh github_package   rstudio/rmarkdown hadley/bookdown"
 - "./travis-tool.sh r_binary_install knitr"
 - "./travis-tool.sh r_binary_install RCurl"
 - mkdir ~/.R
 - cp Makevars ~/.R
+
+script: jekyll build
 
 after_failure:
 - "./travis-tool.sh dump_logs"
