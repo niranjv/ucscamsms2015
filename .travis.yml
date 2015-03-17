@@ -1,7 +1,6 @@
 language: r
 warnings_are_errors: true
 
-
 cran: http://cran.rstudio.com
 
 r_binary_packages:
@@ -12,8 +11,8 @@ r_github_packages:
   - hadley/bookdown
   - rstudio/rmarkdown
 
-install:
-  - sudo apt-get install texlive-xetex
+apt_packages:
+  - install texlive-xetex
 
 script:
   - xelatex -version
