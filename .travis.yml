@@ -9,7 +9,6 @@ r_binary_packages:
 r_github_packages:
   - hadley/devtools
   - hadley/bookdown
-  - rstudio/rmarkdown
 
 apt_packages:
   - texlive-xetex
