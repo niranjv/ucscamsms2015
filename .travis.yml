@@ -7,14 +7,22 @@ r_binary_packages:
   - RCurl
   - knitr
 r_github_packages:
-  - hadley/devtools
   - hadley/bookdown
 
 apt_packages:
   - texlive-xetex
   - fonts-inconsolata
 
-after_install: xelatex -version
+script:
+  - xelatex -version
+  - pandoc --version
+  - pandoc-citeproc --version
+
+  # Update font-cache to include inconsolata
+  - sudo fc-cache -fv
+
+  # Create PDF file
+  - Rscript  './report/build-report.r'
 
 notifications:
   email:
