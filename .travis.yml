@@ -14,10 +14,7 @@ apt_packages:
   - texlive-xetex
   - fonts-inconsolata
 
-script:
-  - xelatex -version
-  - pandoc --version
-  - pandoc-citeproc --version
+after_install: xelatex -version
 
 notifications:
   email:
