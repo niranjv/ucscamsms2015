@@ -12,6 +12,12 @@ r_github_packages:
 
 apt_packages:
   - texlive-xetex
+  - fonts-inconsolata
+
+script:
+  - xelatex -version
+  - pandoc --version
+  - pandoc-citeproc --version
 
 notifications:
   email:
