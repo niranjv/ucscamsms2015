@@ -3,15 +3,15 @@ warnings_are_errors: true
 
 cran: http://cran.rstudio.com
 
+apt_packages:
+  - texlive-xetex
+  - fonts-inconsolata
+
 r_binary_packages:
   - RCurl
   - knitr
 r_github_packages:
   - hadley/bookdown
-
-apt_packages:
-  - texlive-xetex
-  - fonts-inconsolata
 
 script:
   - xelatex -version
