@@ -1,7 +1,6 @@
 ---
 layout: default
 title: default
-output: bookdown::html_chapter
 bibliography: biblio.bib
 ---
 
@@ -24,6 +23,7 @@ This is the code for the schedulr R package
                               })
 
   read_chunk(path=filename, labels=c('all'))
+  on.exit(unlink(filename))
 ```
 
 ```{r eval=FALSE}
