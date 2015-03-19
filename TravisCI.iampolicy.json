@@ -1,0 +1,35 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowListBucketIfSpecificPrefixIsIncludedInRequest",
+            "Effect": "Allow",
+            "Action": [
+              "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::io.github.niranjv"
+            ],
+            "Condition":{  "StringLike":{"s3:prefix":["ucscamsms2015/*"] }}
+        },
+        {
+            "Sid": "AllowUserToWriteObjectDataInucscmasms2015Folder",
+            "Effect": "Allow",
+            "Action": [
+              "s3:PutObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::io.github.niranjv/ucscamsms2015/*"
+            ]
+        },
+        {
+           "Sid": "ExplicitlyDenyAnyRequestsForAllOtherFoldersExceptucscmsams2015",
+           "Action": ["s3:ListBucket"],
+           "Effect": "Deny",
+           "Resource": ["arn:aws:s3:::io.github.niranjv"],
+           "Condition":{  "StringNotLike": {"s3:prefix":["ucscamsms2015/*"] },
+                          "Null"         : {"s3:prefix":false }
+            }
+        }
+    ]
+}
