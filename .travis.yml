@@ -28,7 +28,7 @@ install:
   # Install R packages
   - ./travis-tool.sh r_binary_install knitr RCurl
   - ./travis-tool.sh github_package   hadley/devtools hadley/bookdown
-  - ./travis-tool.sh github_package   niranjv/schedulr
+  - ./travis-tool.sh github_package   niranjv/schedulr@develop
 
 script:
   - Rscript report/build-report.r
