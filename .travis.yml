@@ -31,7 +31,7 @@ install:
 
 
 script:
-  - report/build-report.r
+  - Rscript report/build-report.r
 
 after_failure:
   - ./travis-tool.sh dump_logs
