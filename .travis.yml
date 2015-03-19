@@ -1,55 +1,56 @@
-# Based on https://github.com/craigcitro/r-travis/blob/master/sample.travis.yml
+# Based on:
+# https://github.com/craigcitro/r-travis/blob/master/sample.travis.yml
+# https://github.com/hadley/r-pkgs/blob/master/.travis.yml
 
 language: c
 
 env:
-  - WARNINGS_ARE_ERRORS=1
+- WARNINGS_ARE_ERRORS=1
 
 before_install:
-  - curl -OL http://raw.github.com/craigcitro/r-travis/master/scripts/travis-tool.sh
-  - chmod 755 ./travis-tool.sh
-  - ./travis-tool.sh bootstrap
+- curl -OL http://raw.github.com/craigcitro/r-travis/master/scripts/travis-tool.sh
+- chmod 755 ./travis-tool.sh
+- "./travis-tool.sh bootstrap"
 
 install:
-  # Install binary pandoc from Rstudio
-  - export PATH="$HOME/pandoc:$PATH"
-  - mkdir $HOME/pandoc
-  - curl -O https://s3.amazonaws.com/rstudio-buildtools/pandoc-1.12.3.zip
-  - unzip -j pandoc-1.12.3.zip pandoc-1.12.3/linux/debian/x86_64/*
-      -d $HOME/pandoc
-  - chmod +x $HOME/pandoc/pandoc
-  - pandoc --version
+# Install binary pandoc from RStudio
+- export PATH="$HOME/pandoc:$PATH"
+- mkdir $HOME/pandoc
+- curl -O https://s3.amazonaws.com/rstudio-buildtools/pandoc-1.12.3.zip
+- unzip -j pandoc-1.12.3.zip pandoc-1.12.3/linux/debian/x86_64/* -d $HOME/pandoc
+- chmod +x $HOME/pandoc/pandoc
+- pandoc --version
 
-  # Install xetex & inconsolata font
-  - sudo apt-get install texlive-xetex
-  - sudo apt-get install fonts-inconsolata
-  - sudo fc-cache -fv
+# Install xetex and inconsolata font
+- sudo apt-get install texlive-xetex
+- sudo apt-get install fonts-inconsolata
+- sudo fc-cache -fv
 
-  # Install R packages
-  - ./travis-tool.sh r_binary_install knitr RCurl
-  - ./travis-tool.sh github_package   hadley/devtools hadley/bookdown
-  - ./travis-tool.sh github_package   niranjv/schedulr@develop
+# Install R packages
+- "./travis-tool.sh r_binary_install knitr RCurl"
+- "./travis-tool.sh github_package   hadley/devtools hadley/bookdown"
+- "./travis-tool.sh github_package   niranjv/schedulr@develop"
 
 script:
-  - Rscript report/build-report.r
+- Rscript report/build-report.r
 
 after_failure:
-  - ./travis-tool.sh dump_logs
+- "./travis-tool.sh dump_logs"
 
 deploy:
   provider: s3
   access_key_id: AKIAJXAGPD4HZ5IORX2Q
   secret_access_key:
-    secure: gaZ9Ds61sQwp0yG5wS5LGA1/DYCzbQyiW/rvsaw3GWLbK/QZhByoki+TqEvW+/DGBShQ3Sc4+ZIpQdOCwZ9OIMRG/Tu8GHxJX2fSheW5soH5l5Pm78SUoAIw+d53wDaIfM12xye05L1HVjrmWqID7Hhn+p1U1znKr9k5I4in1Jo=
+    secure: i7JNkQK84DAxHFZjSTFWYf5+3WcI5Ku09ZMPXfrFjKeIwWcsVHAggSUzyWq/oeNpWxkVLFJdpKIZnddCoOzTxb5qbyrKtyNV76TWoGcAsX78hMnAAtpysLDK3Pw0SLGJoZUvrg/EMMBbfftMfmRyphPh0qHKch//1g+k1PyEtOw=
   bucket: io.github.niranjv
   endpoint: io.github.niranjv.s3-website-us-east-1.amazonaws.com
-  upload-dir: ucscamsms2015
-  local_dir: report
   detect_encoding: true
   skip_cleanup: true
+  local-dir: report
+  upload-dir: ucscamsms2015
   on:
+    repo: niranjv/ucscamsms2015
     branch: develop
-
 
 notifications:
   email:
