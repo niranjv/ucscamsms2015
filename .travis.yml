@@ -47,6 +47,8 @@ deploy:
   local_dir: report
   detect_encoding: true
   skip_cleanup: true
+  on:
+    branch: develop
 
 
 notifications:
