@@ -42,8 +42,8 @@ deploy:
   access_key_id: AKIAJXAGPD4HZ5IORX2Q
   secret_access_key:
     secure: i7JNkQK84DAxHFZjSTFWYf5+3WcI5Ku09ZMPXfrFjKeIwWcsVHAggSUzyWq/oeNpWxkVLFJdpKIZnddCoOzTxb5qbyrKtyNV76TWoGcAsX78hMnAAtpysLDK3Pw0SLGJoZUvrg/EMMBbfftMfmRyphPh0qHKch//1g+k1PyEtOw=
+  acl: public_read
   bucket: io.github.niranjv
-  endpoint: io.github.niranjv.s3-website-us-east-1.amazonaws.com
   detect_encoding: true
   skip_cleanup: true
   local-dir: report
