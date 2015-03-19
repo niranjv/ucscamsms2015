@@ -32,7 +32,9 @@ install:
 - "./travis-tool.sh github_package   niranjv/schedulr@develop"
 
 script:
+- mkdir output
 - Rscript report/build-report.r
+- cp report/report.pdf output/report.pdf
 
 after_failure:
 - "./travis-tool.sh dump_logs"
@@ -45,7 +47,7 @@ deploy:
   bucket: io.github.niranjv
   detect_encoding: true
   skip_cleanup: true
-  local-dir: report
+  local-dir: output
   upload-dir: ucscamsms2015
   on:
     repo: niranjv/ucscamsms2015
