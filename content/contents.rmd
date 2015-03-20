@@ -1,6 +1,4 @@
 ---
-layout: default
-title: default
 bibliography: biblio.bib
 ---
 
@@ -8,18 +6,26 @@ bibliography: biblio.bib
 
 This is the introduction
 
-## Section 1
-
-This is intro - section 1
-
-## Section 2
-
-This is intro - section 2
+Using glossary entries \gls{r0}, \gls{kdeac}, \gls{pi}, etc.
 
 This is a reference to [@a778431]
 
 
 # Single Processor case
+
+**Overview**:
+
+* Utility = Benefit ($) - Runtime (hrs) x MachineCost ($/hr)
+* Benefit and MachineCost are fixed
+* Need an accurate estimate of Runtime
+* For this:
+ * < 50 tasks/job: use bootstrap sampling to get runtime dist.
+ * \>= 50 tasks/job: use Normal approx. to get runtime dist.
+* In both cases, compare predicted runtime with actual runtime and show that
+actual runtime falls within 95% CI of predicted runtime
+* Do this for all machines in the action space and pick the machine with the
+best utility
+
 
 ## Case 1: < 50 tasks/job
 * Runtime dist. generated via bootstrap sampling
@@ -72,7 +78,7 @@ This is the conclusion
 
 ## Future work
 
-This is future work to be done
+Future work includes extending the methodology developed above in the following ways:
 
 ### Extension to Spot instances
 Currently, cost = runtime (hrs) x cost (\$/hr).
@@ -84,7 +90,7 @@ Need to model the cost effectively and pick a maximum bid price such that the jo
 Can extend this further by using a low bid price with checkpointing and re-processing the task that was interrupted and processing all remaining tasks
 Need to consider the possibility that might not get a Spot instance and will have to use an On Demand instance instead for the remaining tasks.
 
-### Variance of runtimes & trainingset sample sizes
+### Variance of runtimes & training set sample sizes
 Currently using a fixed number of samples for each task size.
 It is possible that different task sizes will have different number of training set samples.
 Runtimes for task sizes with large number of training set samples will have lower variance that runtimes for sizes with fewer number of samples.
