@@ -25,62 +25,23 @@ This is a reference to [@a778431]
 * Runtime dist. generated via bootstrap sampling
 * Shape of dist. depends on number of bootstrap samples
 
-```{r init}
-library(schedulr)
+```{r cache=FALSE, echo=FALSE}
+  knitr::read_chunk('../bin/plot.R')
+```
 
-data(m3xlarge.runtimes.expdist)
-setup.trainingset.runtimes('m3xlarge', m3xlarge.runtimes.expdist)
-
+```{r init, echo=FALSE}
 ```
 
 Example of scheduling 1 task on 1 instance. The relevant figure is Figure
-\ref{fig:plot1}.
+\ref{fig:sched-1task-1inst}.
 
-``` {r plot1, fig.cap='Caption: Schedule 1 task on 1 instance \\label{fig:plot1}'}
-
-job <- c(1)
-deadline <- 300
-cluster.instance.type <- 'm3xlarge'
-cluster.size <- 1
-max.iter <- 10
-max.temp <- 0.5
-reset.score.pct <- 10
-
-best.schedule <- schedule(job, deadline, cluster.instance.type, cluster.size,
-max.iter, max.temp, reset.score.pct, debug=TRUE)
-scores.ts <- attr(best.schedule, 'scores.ts')
-
-imgTitle <- 'Probability of completing job by deadline'
-plot(scores.ts[,1], scores.ts[,2], type='l', ylim=c(0,1), xlab='Iteration',
-ylab='Score', main=imgTitle)
-lines(scores.ts[,1], scores.ts[,5], type='l', col='#e41a1c')
-grid()
-
+``` {r sched-1task-1inst, echo=FALSE, fig.cap='Caption: Schedule 1 task on 1 instance \\label{fig:sched-1task-1inst}'}
 ```
 
 Example of scheduling 3 tasks on 1 instance. The time series of scores for this
-example is shown in Figure \ref{fig:plot2}.
+example is shown in Figure \ref{fig:sched-3task-2inst}.
 
-``` {r plot2, fig.cap='Caption: Schedule 3 tasks on 1 instance \\label{fig:plot2}'}
-
-job <- c(1,60,100)
-deadline <- 300
-cluster.instance.type <- 'm3xlarge'
-cluster.size <- 1
-max.iter <- 10
-max.temp <- 0.5
-reset.score.pct <- 10
-
-best.schedule <- schedule(job, deadline, cluster.instance.type, cluster.size,
-max.iter, max.temp, reset.score.pct, debug=TRUE)
-scores.ts <- attr(best.schedule, 'scores.ts')
-
-imgTitle <- 'Probability of completing job by deadline'
-plot(scores.ts[,1], scores.ts[,2], type='l', ylim=c(0,1), xlab='Iteration',
-ylab='Score', main=imgTitle)
-lines(scores.ts[,1], scores.ts[,5], type='l', col='#e41a1c')
-grid()
-
+``` {r sched-3task-2inst, echo=FALSE, fig.cap='Caption: Schedule 3 tasks on 1 instance \\label{fig:sched-3task-2inst}'}
 ```
 
 

@@ -12,7 +12,9 @@ needs_update <- function(src, dest) {
 }
 
 render_chapter <- function(src) {
-  dest <- file.path("report/tex/", gsub("\\.rmd", "\\.tex", src))
+
+  # Check for *.tex files in ./report/tex dir
+  dest <- file.path("tex", gsub("\\.rmd", "\\.tex", src))
   if (!needs_update(src, dest)) return()
 
   message("Rendering ", src)
@@ -41,7 +43,8 @@ render_chapter <- function(src) {
   command <- bquote(o$knitr$opts_chunk$fig.height <- 6)
   cat(paste(deparse(command), '\n'), file=r_filename, append=TRUE)
 
-  command <- bquote(rmarkdown::render(.(src), o, output_dir = "report/tex",
+  # Create output *.tex files in ./report/tex directory
+  command <- bquote(rmarkdown::render(.(src), o, output_dir = "../tex",
     quiet = TRUE, env = globalenv()))
   cat(paste(deparse(command), '\n'), file=r_filename, append=TRUE)
 
@@ -66,25 +69,29 @@ source_clean <- function(path) {
 
 # knitr converts *.rmd -> *.md
 # pandoc converts *.md -> *.tex
-chapters <- dir(".", pattern = "\\.rmd$")
+chapters <- dir('content', pattern = '\\.rmd$', full.names=TRUE)
 lapply(chapters, render_chapter)
 
 
 # Copy report.tex and all figures to report/tex/ folder since xelatex expects
 # to find them there
 # report.tex is the parent tex file that includes the tex files generated above
-file.copy("report/report.tex", "report/tex/", recursive = TRUE)
-file.copy("figures/", "report/tex/", recursive = TRUE)
+file.copy('content/report.tex', 'tex/', recursive = TRUE)
+file.remove(dir('tex/figures', full.names=TRUE))
+unlink(dir('tex/figures'), force=TRUE)
+file.rename('content/figures/', 'tex/figures')
 
 
 # xelatex converts report.tex -> report.pdf
 # Run xelatex twice to generate ToC properly since ToC is missing from the
 # PDF file after the 1st pass
-old <- setwd("report/tex")
+old <- setwd("tex")
 system("xelatex -interaction=batchmode report ")
 system("xelatex -interaction=batchmode report ")
 setwd(old)
 
 
 # Copy report.pdf outside the tex folder
-file.copy("report/tex/report.pdf", "report/report.pdf", overwrite = TRUE)
+unlink('output', recursive=TRUE, force=TRUE)
+dir.create('output')
+file.copy("tex/report.pdf", "output/report.pdf", overwrite = TRUE)
