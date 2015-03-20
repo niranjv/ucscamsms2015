@@ -34,6 +34,7 @@ install:
 script:
 - Rscript bin/build-report.R
 - "ls -lhR tex"
+- "cat tex/report.log"
 - "ls -lhR output"
 
 after_failure:
