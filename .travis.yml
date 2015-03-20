@@ -32,7 +32,7 @@ install:
 - "./travis-tool.sh github_package   niranjv/schedulr@develop"
 
 script:
-- Rscript report/build-report.r
+- Rscript bin/build-report.R
 
 after_failure:
 - "./travis-tool.sh dump_logs"
