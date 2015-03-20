@@ -33,7 +33,8 @@ install:
 
 script:
 - Rscript bin/build-report.R
-- Rscript -e "list.files('output')"
+- "ls tex"
+- "ls output"
 
 after_failure:
 - "./travis-tool.sh dump_logs"
