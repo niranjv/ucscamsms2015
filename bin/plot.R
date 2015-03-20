@@ -2,6 +2,7 @@
 # Code for generate plots in Chapters 2 and 3
 
 # ---- init ----
+# Install devtools and use devtools to install schedulr from GitHub
 # install.packages(devtools)
 # devtools::install_github('niranjv/schedulr', ref='develop')
 
