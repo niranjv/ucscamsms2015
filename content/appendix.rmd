@@ -30,9 +30,9 @@ This is the code for the schedulr R package
 This is the code to generate the plots in Chapters 2 and 3
 
 
-## First, set up the code
+## Set up the code
 
-```{r cache=FALSE}
+```{r cache=FALSE, echo=FALSE}
   knitr::read_chunk('../bin/plot.R')
 ```
 
