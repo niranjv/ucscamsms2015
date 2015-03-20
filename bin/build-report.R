@@ -86,6 +86,7 @@ file.rename('content/figures/', 'tex/figures')
 # Run xelatex twice to generate ToC properly since ToC is missing from the
 # PDF file after the 1st pass
 old <- setwd("tex")
+getwd()
 system("xelatex -interaction=batchmode report ")
 system("xelatex -interaction=batchmode report ")
 setwd(old)
