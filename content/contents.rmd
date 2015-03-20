@@ -15,7 +15,7 @@ This is a reference to [@a778431]
 
 **Overview**:
 
-* Utility = Benefit ($) - Runtime (hrs) x MachineCost ($/hr)
+* Utility = Benefit (\$) - Runtime (hrs) x MachineCost (\$/hr)
 * Benefit and MachineCost are fixed
 * Need an accurate estimate of Runtime
 * For this:

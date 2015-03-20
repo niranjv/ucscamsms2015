@@ -90,6 +90,7 @@ old <- setwd("tex")
 system("xelatex -interaction=batchmode report ")
 system("makeglossaries report ")
 system("xelatex -interaction=batchmode report ")
+system("xelatex -interaction=batchmode report ")
 setwd(old)
 
 
