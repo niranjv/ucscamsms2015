@@ -1,11 +1,19 @@
 \documentclass[12pt]{report}
-\usepackage{ graphicx, setspace, psfrag }
-\usepackage{amssymb,amsmath}
+\usepackage{graphicx, setspace, psfrag}
+\usepackage{amssymb, amsmath}
 \usepackage{emptypage}
-\usepackage{url}
+
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=red,
+  urlcolor=blue
+}
+
 
 % Taken from pandoc x.md -o test.tex --standalone
-% Coloring below is based on the One Light syntax theme in Atom text editor (atom.io)
+% Coloring below is based on the One Light syntax theme in Atom text editor
 \usepackage{color}
 \usepackage{fancyvrb}
 \newcommand{\VerbBar}{|}
@@ -33,6 +41,11 @@
 \addtolength{\topmargin}{-0.5in}
 \doublespacing
 \raggedbottom
+
+\usepackage[nonumberlist, toc]{glossaries}
+\makeglossaries
+\include{glossary}
+
 
 \begin{document}
 
@@ -110,7 +123,7 @@ Professor David Draper
 \listoffigures
 
 \newpage
-\begin{center} \textbf{\large ACKNOWLEDGMENTS} \end{center}
+\begin{center} \textbf{\large ACKNOWLEDGEMENTS} \end{center}
 \bigskip
 \noindent
 This master's project could not have been written without the help of
@@ -124,6 +137,9 @@ encouragement, and expertise needed for the advancement of my education.
 
 \newpage
 \printbibliography
+
+\newpage
+\printglossaries
 
 \appendix
 \include{appendix}

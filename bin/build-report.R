@@ -77,6 +77,7 @@ lapply(chapters, render_chapter)
 # to find them there
 # report.tex is the parent tex file that includes the tex files generated above
 file.copy('content/report.tex', 'tex/', recursive = TRUE)
+file.copy('content/glossary.tex', 'tex/', recursive = TRUE)
 file.remove(dir('tex/figures', full.names=TRUE))
 unlink(dir('tex/figures'), force=TRUE)
 file.rename('content/figures/', 'tex/figures')
@@ -87,6 +88,7 @@ file.rename('content/figures/', 'tex/figures')
 # PDF file after the 1st pass
 old <- setwd("tex")
 system("xelatex -interaction=batchmode report ")
+system("makeglossaries report ")
 system("xelatex -interaction=batchmode report ")
 setwd(old)
 
