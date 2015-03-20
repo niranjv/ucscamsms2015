@@ -23,6 +23,7 @@ install:
 
 # Install xetex and inconsolata font
 - sudo apt-get install texlive-xetex
+- sudo apt-get install texlive-latex-extra
 - sudo apt-get install fonts-inconsolata
 - sudo fc-cache -fv
 
