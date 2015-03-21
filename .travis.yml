@@ -22,8 +22,11 @@ install:
 - pandoc --version
 
 # Install xetex and inconsolata font
-- sudo apt-get install texlive-xetex
-- sudo apt-get install texlive-latex-extra
+- sudo apt-get install lmodern texinfo texlive-base texlive-extra-utils
+- sudo apt-get install texlive-fonts-extra texlive-fonts-recommended
+- sudo apt-get install texlive-generic-recommended texlive-latex-base
+- sudo apt-get install texlive-latex-extra texlive-latex-recommended
+- sudo apt-get install texlive-xetex texlive-latex-extra
 - sudo apt-get install fonts-inconsolata
 - sudo fc-cache -fv
 
