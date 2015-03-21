@@ -52,8 +52,8 @@ This is the code to generate the plots in Chapters 2 and 3
 
 # Colophon
 
-* This document was written entirely in the R Markdown (v2) format
-(http://rmarkdown.rstudio.com) and is an example of a dynamic document for
+* This document was written mostly in R Markdown (v2) format
+(http://rmarkdown.rstudio.com) and LaTex and is an example of a dynamic document for
 reproducible research
 * Atom (v0.187.0) was used as the text editor and R Studio IDE (v0.99.292) was
 used to manage R packages and run R code
