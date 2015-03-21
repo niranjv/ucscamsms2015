@@ -88,7 +88,7 @@ file.rename('content/figures/', 'tex/figures')
 # PDF file after the 1st pass
 old <- setwd("tex")
 system("xelatex -interaction=batchmode report ")
-system("makeglossaries report ")
+system("makeindex report.nlo -s nomencl.ist -o report.nls")
 system("xelatex -interaction=batchmode report ")
 system("xelatex -interaction=batchmode report ")
 setwd(old)
