@@ -42,10 +42,8 @@
 \doublespacing
 \raggedbottom
 
-\usepackage[nonumberlist,toc]{glossaries}
-\makeglossaries
-\include{glossary}
-
+\usepackage[intoc]{nomencl}
+\makenomenclature
 
 \begin{document}
 
@@ -111,6 +109,14 @@ Professor David Draper
 \mbox{}
 
 \newpage
+\begin{center} \textbf{\large ACKNOWLEDGEMENTS} \end{center}
+\bigskip
+\noindent
+This master's project could not have been written without the help of
+Prof.~David Draper who gave me the guidance, encouragement, and expertise
+needed for the advancement of my education.
+
+\newpage
 
 \singlespacing
 
@@ -118,17 +124,16 @@ Professor David Draper
 
 \setcounter{tocdepth}{2}
 
+\cleardoublepage
+\addcontentsline{toc}{chapter}{\listtablename}
 \listoftables
 
+\cleardoublepage
+\addcontentsline{toc}{chapter}{\listfigurename}
 \listoffigures
 
 \newpage
-\begin{center} \textbf{\large ACKNOWLEDGEMENTS} \end{center}
-\bigskip
-\noindent
-This master's project could not have been written without the help of
-Prof.~David Draper who gave me the guidance,
-encouragement, and expertise needed for the advancement of my education.
+\printnomenclature
 
 \newpage
 \pagenumbering{arabic}
@@ -137,9 +142,6 @@ encouragement, and expertise needed for the advancement of my education.
 
 \newpage
 \printbibliography
-
-\newpage
-\printglossaries
 
 \appendix
 \include{appendix}
