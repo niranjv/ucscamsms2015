@@ -39,6 +39,11 @@ This is the code to generate the plots in Chapters 2 and 3
 ```{r init, eval=FALSE}
 ```
 
+
+## Code for Figure \ref{fig:bootstrap-95pct-ci}
+``` {r bootstrap-95pct-ci, eval=FALSE}
+```
+
 ## Code for Figure \ref{fig:sched-1task-1inst}
 
 ``` {r sched-1task-1inst, eval=FALSE}
