@@ -34,7 +34,7 @@ render_chapter <- function(src) {
     "markdown+autolink_bare_uris-auto_identifiers+tex_math_single_backslash")
   cat(paste(deparse(command), '\n'), file=r_filename, append=TRUE)
 
-  command <- bquote(o$knitr$opts_chunk$fig.caption <- 'yes')
+  command <- bquote(o$knitr$opts_chunk$fig.caption <- TRUE)
   cat(paste(deparse(command), '\n'), file=r_filename, append=TRUE)
 
   command <- bquote(o$knitr$opts_chunk$fig.width <- 6)
@@ -76,7 +76,7 @@ lapply(chapters, render_chapter)
 # Copy report.tex and all figures to report/tex/ folder since xelatex expects
 # to find them there
 # report.tex is the parent tex file that includes the tex files generated above
-file.copy('content/report.tex', 'tex/', recursive = TRUE)
+file.copy('content/report.tex', 'tex/')
 file.remove(dir('tex/figures', full.names=TRUE))
 unlink(dir('tex/figures'), force=TRUE)
 file.rename('content/figures/', 'tex/figures')
