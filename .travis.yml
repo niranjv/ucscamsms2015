@@ -65,7 +65,7 @@ deploy:
   detect_encoding: true
   skip_cleanup: true
   local-dir: tex
-  upload-dir: ucscamsms2015/tex/
+  upload-dir: ucscamsms2015/tex
   on:
     repo: niranjv/ucscamsms2015
     branch: develop
