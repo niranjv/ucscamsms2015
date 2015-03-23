@@ -2,6 +2,13 @@
 bibliography: biblio.bib
 ---
 
+```{r cache=FALSE, echo=FALSE}
+  knitr::read_chunk('../bin/plot.R')
+```
+
+```{r init, echo=FALSE}
+```
+
 # Introduction
 
 This is the introduction
@@ -27,25 +34,25 @@ This is a reference to [@a778431]
 
 * Utility = Benefit (\$) - Runtime (hrs) x MachineCost (\$/hr)
 * Benefit and MachineCost are fixed
-* Need an accurate estimate of Runtime
-* For this:
- * < 50 tasks/job: use bootstrap sampling to get runtime dist.
- * \>= 50 tasks/job: use Normal approx. to get runtime dist.
-* In both cases, compare predicted runtime with actual runtime and show that
-actual runtime falls within 95% CI of predicted runtime
+* Need a 95% CI for job runtime; use mean runtime to calculate Utility
+* The actual job runtime (sum of runtimes of tasks in job) must fall within
+this 95% CI 95 times out of 100 (this is calibration)
+* To get dist. of job runtime:
+ * \< 50 tasks/job: use bootstrap sampling of training set samples
+ * \>= 50 tasks/job: use Normal approx. (via CLT)
 * Do this for all machines in the action space and pick the machine with the
-best utility
+highest utility
 
 
 ## Case 1: < 50 tasks/job
 * Runtime dist. generated via bootstrap sampling
 * Shape of dist. depends on number of bootstrap samples
 
-```{r cache=FALSE, echo=FALSE}
-  knitr::read_chunk('../bin/plot.R')
-```
 
-```{r init, echo=FALSE}
+Example of scheduling 3 tasks on 1 instance. The time series of scores for this
+example is shown in Figure \ref{fig:sched-3task-2inst}.
+
+``` {r sched-3task-2inst, echo=FALSE, fig.cap='Caption: Schedule 3 tasks on 1 instance \\label{fig:sched-3task-2inst}'}
 ```
 
 Example of scheduling 1 task on 1 instance. The relevant figure is Figure
@@ -54,10 +61,11 @@ Example of scheduling 1 task on 1 instance. The relevant figure is Figure
 ``` {r sched-1task-1inst, echo=FALSE, fig.cap='Caption: Schedule 1 task on 1 instance \\label{fig:sched-1task-1inst}'}
 ```
 
-Example of scheduling 3 tasks on 1 instance. The time series of scores for this
-example is shown in Figure \ref{fig:sched-3task-2inst}.
 
-``` {r sched-3task-2inst, echo=FALSE, fig.cap='Caption: Schedule 3 tasks on 1 instance \\label{fig:sched-3task-2inst}'}
+Figure \ref{fig:bootstrap-95pct-ci} shows the 95 pct confidence intervals for jobs
+with 1 task (on a single machine).
+
+``` {r bootstrap-95pct-ci, echo=FALSE, fig.cap='95 pct CI for job runtime based on bootstrap re-sampling \\label{fig:bootstrap-95pct-ci}'}
 ```
 
 
