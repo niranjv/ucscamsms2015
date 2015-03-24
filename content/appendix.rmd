@@ -1,4 +1,36 @@
 
+# Code to generate figures in Chapters 2 and 3
+
+This is the code to generate the plots in Chapters 2 and 3
+
+
+## Set up the code
+
+```{r cache=FALSE, echo=FALSE}
+  knitr::read_chunk('../bin/plot.R')
+```
+
+```{r init, eval=FALSE}
+```
+
+## Code for Figure \ref{fig:bootstrap-95pct-ub-1processor-1task}
+``` {r bootstrap-95pct-ub-1processor-1task, eval=FALSE}
+```
+
+## Code for Figure \ref{fig:bootstrap-95pct-ub-1processor-10tasks}, \ref{fig:bootstrap-95pct-ub-1processor-50tasks},  \ref{fig:bootstrap-95pct-ub-1processor-100tasks} and \ref{fig:bootstrap-95pct-ub-1processor-150tasks}
+Same as that for Figure \ref{fig:bootstrap-95pct-ub-1processor-1task} but with
+`num.tasks` set to 10, 50, 100 and 150 respectively.
+
+## Code for Figure \ref{fig:sched-1task-1inst}
+
+``` {r sched-1task-1inst, eval=FALSE}
+```
+
+## Code for Figure \ref{fig:sched-3task-2inst}
+
+``` {r sched-3task-2inst, eval=FALSE}
+```
+
 # Code for schedulr R package
 
 This is the code for the schedulr R package
@@ -24,36 +56,6 @@ This is the code for the schedulr R package
 ```{r eval=FALSE}
   <<all>>
 ```
-
-# Code to generate figures in Chapters 2 and 3
-
-This is the code to generate the plots in Chapters 2 and 3
-
-
-## Set up the code
-
-```{r cache=FALSE, echo=FALSE}
-  knitr::read_chunk('../bin/plot.R')
-```
-
-```{r init, eval=FALSE}
-```
-
-
-## Code for Figure \ref{fig:bootstrap-95pct-ci}
-``` {r bootstrap-95pct-ci, eval=FALSE}
-```
-
-## Code for Figure \ref{fig:sched-1task-1inst}
-
-``` {r sched-1task-1inst, eval=FALSE}
-```
-
-## Code for Figure \ref{fig:sched-3task-2inst}
-
-``` {r sched-3task-2inst, eval=FALSE}
-```
-
 
 # Colophon
 
