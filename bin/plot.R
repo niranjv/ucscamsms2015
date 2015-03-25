@@ -42,8 +42,8 @@ for(i in 1:num.trials) {
     a <- get.initial.assignment(1, s[,1], rts)
   }
 
-  # 0.95 quantile of job runtime
-  score <- get.score(a, rt, rts, 100) # deadline does not matter
+  # get 0.95 quantile of job runtime; deadline and score don't matter
+  score <- get.score(a, rt, rts, 100)
   result[i,2] <- attr(score, 'runtime95pct')
 
 } # end for - loop over all trials

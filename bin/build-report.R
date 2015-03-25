@@ -67,6 +67,8 @@ source_clean <- function(path) {
 }
 
 
+start.time <- proc.time()
+
 # knitr converts *.rmd -> *.md
 # pandoc converts *.md -> *.tex
 chapters <- dir('content', pattern = '\\.rmd$', full.names=TRUE)
@@ -97,3 +99,6 @@ setwd(old)
 unlink('output', recursive=TRUE, force=TRUE)
 dir.create('output')
 file.copy("tex/report.pdf", "output/report.pdf", overwrite = TRUE)
+
+d <- proc.time()-start.time
+cat('Time taken: ', round(d[3]/60,2), ' mins \n')

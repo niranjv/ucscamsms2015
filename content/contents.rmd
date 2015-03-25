@@ -28,7 +28,7 @@ follows easily.
 This is a reference to [@a778431]
 
 
-# Single Processor case
+# Scoring an Assignment
 
 **Overview**:
 
@@ -96,7 +96,10 @@ runtimes (via CLT).
 ```
 
 
-# Multiple Processor case
+# Finding the optimal assignment
+
+This section is about finding the optimal assignment.
+
 
 ## Case 1: < 50 tasks/job
 
