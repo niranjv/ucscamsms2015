@@ -47,6 +47,10 @@ script:
 - git clone https://github.com/niranjv/ucscamsms2015.git
 - cd ucscamsms2015
 - git checkout gh-pages
+- pwd
+- ls
+- ls ..
+- ls ../..
 - cp ../../output/report.pdf .
 - git add report.pdf
 - git commit report.pdf -m "Add report.PDF"
