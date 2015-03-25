@@ -39,7 +39,8 @@ script:
 after_failure:
 - "./travis-tool.sh dump_logs"
 
-script:
+# commit output PDF file to gh-pages branch
+after_success:
 - mkdir temp
 - cd temp
 - git config --local user.name 'Travis CI'
