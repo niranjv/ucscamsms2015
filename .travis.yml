@@ -6,6 +6,10 @@ language: c
 
 env:
 - WARNINGS_ARE_ERRORS=1
+global:
+  - secure: hbAbKlWMbhusypQVLFI3B4X8nItqMp7S1DLLlgYkQHqnwwcza3KfmXLb5+fLvm8OADxV7jBPtzGDqiHuJy7CYIV8I4dv4MpWaSMwzk3PBdqTSEjIg44QkWAnvT5IyXsEKfMKHyTTc4MekCpd4MN6k+kMhFcoBm/hgvFX7O2jZgg=
+  - GH_REF: https://github.com/niranjv/ucscamsms2015.git
+
 
 before_install:
 - curl -OL http://raw.github.com/craigcitro/r-travis/master/scripts/travis-tool.sh
@@ -40,6 +44,19 @@ script:
 
 after_failure:
 - "./travis-tool.sh dump_logs"
+
+script:
+- mkdir temp
+- cd temp
+- git config --local user.name 'Travis CI'
+- git config --local user.email 'niranjanv+github@gmail.com'
+- git clone https://github.com/niranjv/ucscamsms2015.git
+- cd ucscamsms2015
+- git checkout gh-pages
+- cp ../../output/report.pdf .
+- git add report.pdf
+- git commit report.pdf -m "Add report.PDF"
+- git push --force --quiet "https://${GH_TOKEN}@${GH_REF}" master:gh-pages
 
 deploy:
 - provider: s3
