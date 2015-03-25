@@ -56,6 +56,7 @@ after_success:
 - git add report.pdf
 - git commit report.pdf -m "Add report.PDF"
 - git push --force --quiet "https://${GH_TOKEN}@${GH_REF}" master:gh-pages
+- cd ../..
 
 deploy:
 - provider: s3
