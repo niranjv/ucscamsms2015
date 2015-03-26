@@ -1,20 +1,27 @@
 language: c
+
 env:
   matrix:
   - WARNINGS_ARE_ERRORS=1
   global:
     secure: uc+cJiqoem8V2Eo+CfQ/n87G6vcyzpTjf0FoJ1uGTmapv9H6jO5kG384b+lZQl4R2V9pOisyQnIfRiG09xeXrDx4qDNf55q1jXLITH7u1N0Sj86BcifrBPJp0mvTTXb9tx5h8T6hxQofC/FQ6bUW0AKyjQrKInzxKw28Ccfs4yg=
+
 before_install:
 - curl -OL http://raw.github.com/craigcitro/r-travis/master/scripts/travis-tool.sh
 - chmod 755 ./travis-tool.sh
 - "./travis-tool.sh bootstrap"
+
 install:
+
+# Install pandoc
 - export PATH="$HOME/pandoc:$PATH"
 - mkdir $HOME/pandoc
 - curl -O https://s3.amazonaws.com/rstudio-buildtools/pandoc-1.12.3.zip
 - unzip -j pandoc-1.12.3.zip pandoc-1.12.3/linux/debian/x86_64/* -d $HOME/pandoc
 - chmod +x $HOME/pandoc/pandoc
 - pandoc --version
+
+# Install TeX packages
 - sudo apt-get install texlive-xetex texlive-latex-extra
 - sudo apt-get install lmodern texinfo texlive-base texlive-extra-utils
 - sudo apt-get install texlive-fonts-extra texlive-fonts-recommended
@@ -22,13 +29,21 @@ install:
 - sudo apt-get install texlive-latex-extra texlive-latex-recommended
 - sudo apt-get install fonts-inconsolata
 - sudo fc-cache -fv
+
+# Install R packages
 - "./travis-tool.sh r_binary_install knitr RCurl"
 - "./travis-tool.sh github_package   hadley/devtools hadley/bookdown"
 - "./travis-tool.sh github_package   niranjv/schedulr@develop"
+
+# create PDF file
 script:
 - Rscript bin/build-report.R
+
+
 after_failure:
 - "./travis-tool.sh dump_logs"
+
+# Commit PDF file to gh-pages branch
 after_success:
 - mkdir temp
 - cd temp
@@ -39,43 +54,11 @@ after_success:
 - git clone https://github.com/niranjv/ucscamsms2015.git
 - cd ucscamsms2015
 - git checkout gh-pages
-- pwd
-- ls -l
-- ls -l ..
-- ls -l ../..
 - cp ../../output/report.pdf .
-- ls -l
 - git commit report.pdf -m "Add report.PDF"
-- echo ${GH_TOKEN}
 - git push "https://${GH_TOKEN}@github.com/niranjv/ucscamsms2015.git"
 - cd ../..
-deploy:
-- provider: s3
-  access_key_id: AKIAJXAGPD4HZ5IORX2Q
-  secret_access_key:
-    secure: i7JNkQK84DAxHFZjSTFWYf5+3WcI5Ku09ZMPXfrFjKeIwWcsVHAggSUzyWq/oeNpWxkVLFJdpKIZnddCoOzTxb5qbyrKtyNV76TWoGcAsX78hMnAAtpysLDK3Pw0SLGJoZUvrg/EMMBbfftMfmRyphPh0qHKch//1g+k1PyEtOw=
-  acl: public_read
-  bucket: io.github.niranjv
-  detect_encoding: true
-  skip_cleanup: true
-  local-dir: output
-  upload-dir: ucscamsms2015
-  on:
-    repo: niranjv/ucscamsms2015
-    branch: develop
-- provider: s3
-  access_key_id: AKIAJXAGPD4HZ5IORX2Q
-  secret_access_key:
-    secure: i7JNkQK84DAxHFZjSTFWYf5+3WcI5Ku09ZMPXfrFjKeIwWcsVHAggSUzyWq/oeNpWxkVLFJdpKIZnddCoOzTxb5qbyrKtyNV76TWoGcAsX78hMnAAtpysLDK3Pw0SLGJoZUvrg/EMMBbfftMfmRyphPh0qHKch//1g+k1PyEtOw=
-  acl: public_read
-  bucket: io.github.niranjv
-  detect_encoding: true
-  skip_cleanup: true
-  local-dir: tex
-  upload-dir: ucscamsms2015/tex
-  on:
-    repo: niranjv/ucscamsms2015
-    branch: develop
+
 notifications:
   email:
     on_success: change
