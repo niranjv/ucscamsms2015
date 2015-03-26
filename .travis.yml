@@ -6,9 +6,8 @@ language: c
 
 env:
 - WARNINGS_ARE_ERRORS=1
-global:
-  - secure: hbAbKlWMbhusypQVLFI3B4X8nItqMp7S1DLLlgYkQHqnwwcza3KfmXLb5+fLvm8OADxV7jBPtzGDqiHuJy7CYIV8I4dv4MpWaSMwzk3PBdqTSEjIg44QkWAnvT5IyXsEKfMKHyTTc4MekCpd4MN6k+kMhFcoBm/hgvFX7O2jZgg=
-  - GH_REF: github.com/niranjv/ucscamsms2015.git
+  global:
+    secure: joBnYwiMQawZSnugRh5wrUKb/xVrPsr/dNAWAYTRY4a0x8H54kTDmIklCNBfzgQBvjPviAjplGd3tjcIF4h5srEYLfTtg4+6aCA9Gs08L7EtKN6CcBHItAbaSljKpfzAj2QeVf2tiXJFDB5rg8dYl9yJTKKMIFSdAyCUAMqOzPg=
 
 before_install:
 - curl -OL http://raw.github.com/craigcitro/r-travis/master/scripts/travis-tool.sh
@@ -57,9 +56,9 @@ after_success:
 - cp ../../output/report.pdf .
 - ls -l
 - git commit report.pdf -m "Add report.PDF"
-- git push "https://${GH_TOKEN}@${GH_REF}"
+- echo ${GH_TOKEN}
+- git push "https://${GH_TOKEN}@github.com/niranjv/ucscamsms2015.git"
 - cd ../..
-
 
 deploy:
 - provider: s3
