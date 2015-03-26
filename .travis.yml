@@ -1,19 +1,13 @@
-# Based on:
-# https://github.com/craigcitro/r-travis/blob/master/sample.travis.yml
-# https://github.com/hadley/r-pkgs/blob/master/.travis.yml
-
 language: c
-
 env:
-- WARNINGS_ARE_ERRORS=1
+  matrix:
+  - WARNINGS_ARE_ERRORS=1
   global:
-    secure: joBnYwiMQawZSnugRh5wrUKb/xVrPsr/dNAWAYTRY4a0x8H54kTDmIklCNBfzgQBvjPviAjplGd3tjcIF4h5srEYLfTtg4+6aCA9Gs08L7EtKN6CcBHItAbaSljKpfzAj2QeVf2tiXJFDB5rg8dYl9yJTKKMIFSdAyCUAMqOzPg=
-
+    secure: uc+cJiqoem8V2Eo+CfQ/n87G6vcyzpTjf0FoJ1uGTmapv9H6jO5kG384b+lZQl4R2V9pOisyQnIfRiG09xeXrDx4qDNf55q1jXLITH7u1N0Sj86BcifrBPJp0mvTTXb9tx5h8T6hxQofC/FQ6bUW0AKyjQrKInzxKw28Ccfs4yg=
 before_install:
 - curl -OL http://raw.github.com/craigcitro/r-travis/master/scripts/travis-tool.sh
 - chmod 755 ./travis-tool.sh
 - "./travis-tool.sh bootstrap"
-
 install:
 - export PATH="$HOME/pandoc:$PATH"
 - mkdir $HOME/pandoc
@@ -31,14 +25,10 @@ install:
 - "./travis-tool.sh r_binary_install knitr RCurl"
 - "./travis-tool.sh github_package   hadley/devtools hadley/bookdown"
 - "./travis-tool.sh github_package   niranjv/schedulr@develop"
-
 script:
 - Rscript bin/build-report.R
-
 after_failure:
 - "./travis-tool.sh dump_logs"
-
-# commit output PDF file to gh-pages branch
 after_success:
 - mkdir temp
 - cd temp
@@ -59,7 +49,6 @@ after_success:
 - echo ${GH_TOKEN}
 - git push "https://${GH_TOKEN}@github.com/niranjv/ucscamsms2015.git"
 - cd ../..
-
 deploy:
 - provider: s3
   access_key_id: AKIAJXAGPD4HZ5IORX2Q
@@ -74,7 +63,6 @@ deploy:
   on:
     repo: niranjv/ucscamsms2015
     branch: develop
-
 - provider: s3
   access_key_id: AKIAJXAGPD4HZ5IORX2Q
   secret_access_key:
@@ -88,7 +76,6 @@ deploy:
   on:
     repo: niranjv/ucscamsms2015
     branch: develop
-
 notifications:
   email:
     on_success: change
