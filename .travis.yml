@@ -39,25 +39,12 @@ install:
 script:
 - Rscript bin/build-report.R
 
-
 after_failure:
 - "./travis-tool.sh dump_logs"
 
-# Commit PDF file to gh-pages branch
+# Commit output PDF file to gh-pages branch
 after_success:
-- mkdir temp
-- cd temp
-- git init
-- git config --global user.name 'Travis CI'
-- git config --global user.email 'niranjanv+github@gmail.com'
-- git config --global push.default simple
-- git clone https://github.com/niranjv/ucscamsms2015.git
-- cd ucscamsms2015
-- git checkout gh-pages
-- cp ../../output/report.pdf .
-- git commit report.pdf -m "Add report.PDF"
-- git push "https://${GH_TOKEN}@github.com/niranjv/ucscamsms2015.git"
-- cd ../..
+- bash ./bin/deploy-pdf-to-gh-pages.sh
 
 notifications:
   email:
