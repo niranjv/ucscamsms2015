@@ -17,9 +17,9 @@ This is the code to generate the plots in Chapters 2 and 3
 ``` {r bootstrap-95pct-ub-1processor-1task, eval=FALSE}
 ```
 
-## Code for Figure \ref{fig:bootstrap-95pct-ub-1processor-10tasks}, \ref{fig:bootstrap-95pct-ub-1processor-50tasks},  \ref{fig:bootstrap-95pct-ub-1processor-100tasks} and \ref{fig:bootstrap-95pct-ub-1processor-150tasks}
+## Code for Figure \ref{fig:bootstrap-95pct-ub-1processor-10tasks}, \ref{fig:bootstrap-95pct-ub-1processor-50tasks},  \ref{fig:bootstrap-95pct-ub-1processor-100tasks} \ref{fig:bootstrap-95pct-ub-1processor-150tasks} and \ref{fig:bootstrap-95pct-ub-1processor-200tasks}
 Same as that for Figure \ref{fig:bootstrap-95pct-ub-1processor-1task} but with
-`num.tasks` set to 10, 50, 100 and 150 respectively.
+`num.tasks` set to 10, 50, 100, 150 and 200 respectively.
 
 ## Code for Figure \ref{fig:sched-1task-1inst}
 
