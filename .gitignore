@@ -14,3 +14,4 @@ packrat/lib*/
 tex
 # dir containing final PDF file; Travis will copy file to S3
 output
+.Rproj.user
