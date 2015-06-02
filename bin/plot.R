@@ -330,3 +330,23 @@ plot(scores.ts[,1], scores.ts[,2], type='l', ylim=c(0,1), xlab='Iteration',
 ylab='Score', main=imgTitle)
 lines(scores.ts[,1], scores.ts[,5], type='l', col='#e41a1c')
 grid()
+
+
+# ---- sched-113task-4inst ----
+job <- c(1,2,2,2,3,3,4,4,5,10,10,10,15,15,15,25,25,25,25,25,30,35,35,35,40,40,45,50,50,50,55,65,70,75,75,80,85,85,95,95,95,100,110,115,125,130,135,150,155,155,155,155,155,165,170,170,175,180,185,185,190,190,195,220,220,230,230,250,250,275,300,300,300,300,325,325,350,350,375,400,450,450,500,550,550,650,650,800,900,900,900,950,1000,1300,1300,1300,1500,1600,1700,1700,1700,1800,1900,1900,1900,2000,2200,2300,2500,2600,2700,2800,2900)
+deadline <- 5000
+cluster.instance.type <- 'm3xlarge'
+cluster.size <- 4
+max.iter <- 100
+max.temp <- 0.5
+reset.score.pct <- 10
+
+best.schedule <- schedule(job, deadline, cluster.instance.type, cluster.size,
+max.iter, max.temp, reset.score.pct, debug=TRUE)
+scores.ts <- attr(best.schedule, 'scores.ts')
+
+imgTitle <- 'Score of accepted assignments in 100 SA iterations \n (113 tasks on 4 processors)'
+plot(scores.ts[,1], scores.ts[,2], type='l', lwd=2, ylim=c(0,1), xlab='Iteration',
+ylab='Score', main=imgTitle)
+lines(scores.ts[,1], scores.ts[,5], type='l', lwd=2, col='#e41a1c')
+grid()
