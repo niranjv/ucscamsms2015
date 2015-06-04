@@ -69,7 +69,7 @@ source_clean <- function(path) {
 
 # ----------==========----------
 
-
+date()
 start.time <- proc.time()
 
 # knitr converts *.rmd -> *.md
@@ -105,3 +105,4 @@ file.copy("tex/report.pdf", "output/report.pdf", overwrite = TRUE)
 
 d <- proc.time()-start.time
 cat('Time taken: ', round(d[3]/60,2), ' mins \n')
+date()
