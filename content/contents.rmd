@@ -11,44 +11,131 @@ bibliography: ucscamsms2015.bib
 
 # Introduction
 
-This is the introduction
+Scheduling refers to the process of assigning tasks to resources that complete the tasks.
+It is a very common problem and arises in a variety of everyday situations such as scheduling manufacturing tasks in factories, scheduling takeoffs and landings of planes in airports, scheduling sports tournaments, scheduling nurse shifts in hospitals, scheduling tasks across multiple instances, etc. [@Hoos2004].
 
-## Problem formulation
+The input to a scheduling problem is a set of tasks to be completed and a set of resources that can process the tasks.
+The output is a scheduling assignment that maps tasks to resources in a certain order.
+Scheduling problems are typically subject to various feasibility constraints that define a valid assignment.
+Examples of such constraints include maintaining minimum time intervals between plane takeoffs and landings, avoiding adjacent shifts for nurses, completing tasks by a certain deadline, using a fixed number of machines, etc.
+Once a set of feasible assignments is available, various optimization criteria are used select the best assignment from this set.
+Examples of such criteria include minimizing total weighted delay over all flights, preference of nurses for certain shifts, minimizing maximum completion time for tasks, etc.
 
-This is the problem formulation.
+An important characteristic of scheduling problems is that the number of feasible assignments is usually very large.
+In such cases, it is not possible to find the globally optimal assignment in a reasonable amount of time.
+In fact, most scheduling problems are considered to be NP-hard [@Garey1979] and form one of the most important classes of combinatorial problems.
+Most approaches to solving scheduling problems involve some kind of local search and try to find, in a 'reasonable' amount of time, an assignment that is 'close enough' to the global optimum. Such approaches are called Polynomial Time Approximation Schemes (PTAS) and generate a solution in polynomial time that is within $(1-\epsilon)$ of the optimal solution (for maximization problems), where $\epsilon$ is any value greater than 0.
+
+Methods used to solve scheduling problems depend on the type of problem being solved.
+Scheduling problems can be classified in various ways based on task characteristics, resource characteristics and optimization criteria [@Hoos2004, @Pinedo2012]. Properties of tasks include pre-emption, release times, deadlines, dependencies, weights, amount of pre-processing, etc.
+
+*Pre-emption* refers to the interruption of a task in progress so that it can be re-started later on the same or different resource.
+*Pre-emptive* schedules allow tasks to be interrupted while non-pre-emptive schedules do not allow pre-emption - once a task has started processing, it must complete processing on the same resource.
+
+Tasks can be associated with release times and deadlines.
+Release time for a task represents the earliest time a task is available for processing.
+A task cannot start processing before its release time.
+A deadline represents the time by which a task must complete processing.
+When a set of tasks is associated with a deadline, all tasks in the set must complete processing by the deadline.
+
+Dependencies between tasks control the order in which tasks can be processed.
+Examples of dependencies include precedence constraints between tasks where one task depends on other tasks and cannot start processing until all tasks on which it is dependent have completed.
+Task weights and the amount of pre-processing tasks have received also influence the types of schedules that can be generated.
+
+Scheduling problems can also be classified by the properties of resources.
+Tasks can be processed on a single resource or by multiple resources in parallel.
+When using resources in parallel, the resources can be *identical* or *unrelated*.
+Identical resources are all of the same type; task runtime will be the same regardless of which resource is used to process the task.
+When using unrelated resources in parallel, runtime for a task depends on the resource used to process the task and might vary for each resource.
+
+Finally, scheduling problems can be classified by the the type of optimization criteria used to select the best schedule from a set of feasible schedules.
+Examples of such criteria include minimizing the maximum completion time (makespan) of a set of tasks, minimizing the weighted completion time of a set of tasks where each task is assigned a weight proportional to its benefit, minimizing the maximum delay of a set of tasks, etc.
+
+In this work, we focus on the problem of finding optimal non-pre-emptive schedules that minimize makespan while processing a set of tasks on multiple identical resources in parallel. All tasks have the same weight, have not undergone any pre-processing and are available for processing.
+
+
+\nomenclature{$\mathcal{T}$}{Set of input tasks that must be processed}
+\nomenclature{$\mathcal{B}$}{Benefit (specified in dollars) paid out when all tasks in $T$ are completed by the deadline. If {$\mathcal{T}$} is not complete by the deadline, $\mathcal{B}=\$0$.}
+\nomenclature{$\mathcal{D}$}{Deadline (specified in seconds) by which all tasks in $\mathcal{T}$ must complete processing}
+\nomenclature{$\mathcal{I}$}{Set of instances available to process tasks}
+\nomenclature{$L_i$}{Length of task $T_i$}
+\nomenclature{$R_i,j$}{Runtime of task $T_i$ on instance $I_j$; known only when $T_i$ completes processing on $I_j$; all instances of the same type are assumed to process the task in the same amount of time}
+\nomenclature{$R_j$}{Total runtime of all tasks assigned to instance $I_j$}
+\nomenclature{$\mathcal{M}$}{Makespan for the set of tasks $\mathcal{T}$}
+
+
+## Problem Formulation
+
+Let $\mathcal{T} := {T_1, T_2, \dots T_n}$ be the set of input tasks that must be processed.
+This set of tasks is associated with a benefit $\mathcal{B}$ specified in dollars and a deadline $\mathcal{D}$ specified in seconds.
+Each task $T_i$ is independent of all other tasks in $\mathcal{T}$; so tasks can be processed in any order.
+$\mathcal{T}$ is considered to complete when all tasks in $\mathcal{T}$ are complete.
+
+Let $I := {I_1, I_2, \dots I_m}$ be the set of resources (also known as instances in this report) available to process tasks in $\mathcal{T}$.
+These instances are grouped into various instance types depending on their configuration.
+Let $r_{i,j}$ be the runtime of task $T_i$ on instance $I_j$.
+Time taken to complete a task depends on the type of instance on which the task is processed; slower instances will take more time to process the same task compared to faster instances.
+
+Let $J_j$ be the set of tasks assigned to instance $I_j$.
+Then $R_j := \sum_{k \in J_j} r_{k,j}$ is the total runtime for all jobs assigned to instance $I_j$.
+The maximum runtime across all instances or **makespan** $\mathcal{M}$ of $\mathcal{T}$ is defined as:
+
+$$\mathcal{M} = \max_{j \in \mathcal{I}} {R_j}$$
+
+The problem of minimizing makespan has been studied extensively [include refs here] but it cannot be solved in polynomial time because the problem is NP-hard even for the simple case of processing tasks on 2 identical instances.
+However, polynomial time approximation schemes have been developed to provide an approximate solution to this problem. One such scheme is a heuristic  called Longest Processing Time First.
+This heuristic first orders tasks in decreasing order of runtimes and then assigns the largest  task that has not yet started processing to the next available machine.
+This scheme has been shown to minimize makespan for tasks whose actual runtimes are known in advance [@Pinedo2012].
+
+But task runtimes $r_{i,j}$ are not always known in advance.
+It is not uncommon to come across problems where runtime is known only when the task completes processing.
+But the probability distribution of runtimes is known before processing starts and PTAS have been developed to find approximate solutions to such problems.
+When the runtimes are exponentially distributed, the Longest *Expected* Processing Time First heuristic has been shown to minimize the *expected* makespan [@Pinedo2012].
+This heuristic first sorts tasks in decreasing order of expected runtime and then assigns the largest task that has not yet started processing to the next available machine. The proof of this heuristic uses the memory-less property of exponential distributions and hence this heuristic is not applicable to cases where the runtimes are not exponentially distributed.
+
+A major contribution of the current work is to present a method to minimize makespan that does not make any assumptions about the distribution of task runtimes.
+
+* Maximizing expected utility
+* equation for maximizing expected utility
+* decision theory
+
+We make the following additional assumptions so that the problem is well-defined:
+
+*
 
 ## Data
 The data for this problem comprises the following:
 
-* **Processor types:**
-Each Amazon data center has hundreds of thousands of virtual machines  (also know as instances) (ref to EC2 website) running on physical hardware.
-Each instance is assigned resources like processor type and speed, memory, local disk space, network speed, etc. and the combination of these resources is called a configuration (also known as instance type).
-Examples of instance types include compute-optimized instances with faster, more powerful processors, memory-optimized instances with large amounts of memory, storage-optimized instances with large amounts of local disk space, etc.
+* **instance types:**
+Each Amazon data center has hundreds of thousands of virtual machines  (also known as instances) (ref to EC2 website) running on physical hardware.
+Each instance is associated with a certain configuration of instance type and speed, memory, local disk space, network speed, etc.
+This configuration of resources represents an instance type.
+Examples of instance types include compute-optimized instance types with faster, more powerful instances, memory-optimized instance types with large amounts of memory, storage-optimized instance types with large amounts of local disk space, etc.
 There are dozens of such instance types and thousands of instances of the same type in each data center.
-These instance types represent the action space with selection of an instance type to process input types being the corresponding action.
-In this report, we assume that tasks are constrained only by processor type and speed and not by any other resource.
-
+The instance types represent the action space of the decision problem with selection of an instance type to process input types being the corresponding action.
+In this work, we assume that tasks are constrained only by instance type and speed and not by any other resource.
 
 * **Task lengths**:
 The input to the problem is a set of tasks.
 Each task is associated with a property called *length*.
 Runtime for a task is roughly proportional to its length.
 Besides length, other properties of the task also influence task runtime.
-If these properties were easy to quantify, then runtime would be deterministic function of length and the properties.
+If these properties were easy to quantify, then runtime would be deterministic function of length and the other properties.
 But these properties are not easily quantifiable, so task runtime is considered to be a random variable with length as the only co-variate that can be used to predict runtime.
 
 * **Training set samples:**
-Runtime for a task depends on the length of the task and the instance type on which the task is processed.
-Distributions for task runtimes do not follow any known distribution and cannot be expressed in closed form.
-Further, each task length can follow a potentially different unknown distribution.
-So runtime distributions for a given task length and instance type are determined empirically by running multiple tasks of the same length on the instance type and recording the actual runtime for each task.
-These empirically determined runtimes form the *training set* for the algorithm and are used to predict runtimes for future tasks with the same length.
+In addition to task length, task runtime also depends on the instance type on which the task is processed.
+Distributions for task runtimes follow arbitrary unknown distributions that cannot be expressed in closed form.
+Further, runtimes for different task lengths can follow potentially different unknown distributions.
+So runtime distributions for a given combination of task length and instance type are determined empirically by running multiple tasks of the same length on the instance type and recording the actual runtime for each task.
+These runtimes form the *training set* for the above combination and are used to predict runtimes for future tasks with the same length on the same instance type.
 It is not practical to obtain a training set sample for all possible task lengths, so a representative sample of 83 task lengths was selected and 200 training set runtimes were generated for each of these lengths.
 
+For the purposes of validation, two separate training sets were generated for each combination of task length and instance type.
+In the first set, the runtimes follow an exponential distribution while in the other set, they follow a Normal distribution.
 
 # Scoring an Assignment
-
-Finding an optimal assignment requires the comparison of assignments to determine the *best* assignment.
+Finding an optimal assignment for a set of tasks requires the comparison of assignments to determine the *best* assignment.
 This comparison requires that each assignment have an associated property (which we call score) that is determined in the same way and with reference to the same baseline for all assignments.
 In this chapter, we develop the definition of such a property and show that it can be used to select the best assignment from a set of assignments.
 
@@ -59,14 +146,13 @@ Thus score is a function that maps an assignment to a value in $(0,1)$.
 The higher the value of the score, the higher the probability of completing all tasks by the deadline and the higher the probability of getting the benefit.
 Since all assignments are scored against the same deadline, assignment score can be used to compare assignments and select the best assignment (i.e., assignment with the highest score).
 
-The total time taken for a set of tasks to finish processing is called *Makespan*.
-This chapter will focus on determining makespan for a single processor and the next chapter will deal with determining makespan when multiple identical processors are used in parallel.
+As mentioned in the previous chapter, we will use makespan as the optimization criterion to select the best assignment from a set of feasible assignments.
+This chapter will focus on determining makespan for a single instance and the next chapter will deal with determining makespan when multiple identical instances are used in parallel.
 
-For a single processor, makespan is the sum of actual runtimes of each task in the input set of tasks and is invariant to the order in which the tasks are processed.
-So tasks can be processed on this processor in an arbitrary order and the action space here is the set of all types of processors that will complete the tasks by the deadline.
-The corresponding action is to select the processor that maximizes the expected utility function (ref to eq in Intro).
+For a single instance, makespan is the sum of actual runtimes of each task in the input set of tasks and is invariant to the order in which the tasks are processed.
+So tasks can be processed on this instance in an arbitrary order and the action space here is the set of instance types available in the data center.
+The corresponding action is the selection of the instance that maximizes the expected utility function [ref to eq in Problem formulation section].
 
-Since task runtimes are not deterministic, but random variables following separate unknown distributions, makespan for a single processor is also a random variable.
 The nature of the makespan distribution depends on the number of tasks whose runtimes are being summed.
 
 
