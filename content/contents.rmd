@@ -49,6 +49,7 @@ The rest of this work deals with developing efficient methods of scheduling task
 
 
 ## Background on Scheduling
+\label{SchedulingOverview}
 
 Scheduling refers to the process of assigning tasks to resources that complete the tasks.
 It is a very common problem and arises in a variety of everyday situations such as scheduling manufacturing tasks in factories, scheduling takeoffs and landings of planes in airports, scheduling sports tournaments, scheduling nurse shifts in hospitals, scheduling tasks across multiple instances, etc. [@Hoos2004].
@@ -86,6 +87,8 @@ When using unrelated resources in parallel, runtime for a task depends on the re
 Finally, scheduling problems can be classified by the the type of optimization criteria used to select the best schedule from a set of feasible schedules.
 Examples of such criteria include minimizing the maximum completion time (also known as *makespan*) of a set of tasks, minimizing the weighted completion time of a set of tasks where each task is assigned a weight proportional to its benefit, minimizing the maximum delay of a set of tasks for tasks with deadlines, etc.
 
+In this work, we focus on the specific problem of finding optimal non-pre-emptive schedules that minimize makespan while processing a set of tasks on multiple identical resources in parallel. All tasks have the same weight, have not undergone any pre-processing and are immediately available for processing.
+
 
 \nomenclature{$\mathcal{T}$}{Set of input tasks that must be processed}
 \nomenclature{$\mathcal{B}$}{Benefit (specified in dollars) paid out when all tasks in $T$ are completed by the deadline. If {$\mathcal{T}$} is not complete by the deadline, $\mathcal{B}=\$0$.}
@@ -101,22 +104,8 @@ Examples of such criteria include minimizing the maximum completion time (also k
 
 ## Problem Formulation
 
-The previous section highlights the need for efficient scheduling methods to complete a set of tasks on time and within budget, especially when the runtimes are distributed according to unknown probability distributions.
-Each schedule is associated with a *cost* that must be paid to the data center for use of their computing resources.
-This cost depends on the amount of time the resources are used and is determined by the *total time* taken by the schedule to complete all input tasks.
-Given a set of *feasible* schedules that can complete the set of tasks by the deadline, finding the schedule in this set that completes the task in the shortest amount of time (and therefore the lowest cost) represents an *optimization problem*.
-
-An important characteristic of scheduling problems is that the number of feasible schedules is usually very large.
-So it is not possible to find the globally optimal schedule in a reasonable amount of time using brute force methods.
-In fact, most scheduling problems are considered to be NP-hard [@Garey1979] and form one of the most important classes of combinatorial problems.
-This leads to the use of various heuristics and stochastic optimization methods to find, in a reasonable amount of time, a schedule that is 'close enough' to the global optimum.
-
-In this work, we focus on the specific problem of finding optimal non-pre-emptive schedules that minimize makespan while processing a set of tasks on multiple identical resources in parallel. All tasks have the same weight, have not undergone any pre-processing and are immediately available for processing.
-
-* Easier to do when the runtimes are known in advance
-* Harder to do when runtimes are random and their distribution is unknown
-* Using Bayesian decision theory to find optimal schedule this via maximizing expected utility
-
+The previous sections highlight the need for efficient scheduling methods to complete a set of tasks on time \underline{and} with the lowest possible processing cost.
+This section specifies the problem in detail while subsequent sections develop methods to solve the problem in an efficient manner.
 
 Let $\mathcal{T} := {T_1, T_2, \dots T_n}$ be the set of input tasks that must be processed.
 This set of tasks is associated with a benefit $\mathcal{B}$ specified in dollars and a deadline $\mathcal{D}$ specified in seconds.
@@ -126,21 +115,35 @@ $\mathcal{T}$ is considered to complete when all tasks in $\mathcal{T}$ are comp
 Let $I := {I_1, I_2, \dots I_m}$ be the set of resources (also known as instances in this work) available to process tasks in $\mathcal{T}$.
 These instances are grouped into various instance types depending on their configuration.
 Let $r_{i,j}$ be the runtime of task $T_i$ on instance $I_j$.
-Time taken to complete a task depends on the type of instance on which the task is processed; slower instances will take more time to process the same task compared to faster instances.
+Time taken to complete a task depends on the type of instance on which the task is processed; slower instances will take more time to process the same task compared to faster instances. Let $C_j$ be the cost per hour of instance $I_j$ (specified in dollars).
 
-Let $J_j$ be the set of tasks assigned to instance $I_j$.
-Then $R_j := \sum_{k \in J_j} r_{k,j}$ is the total runtime for all jobs assigned to instance $I_j$.
-The maximum runtime across all instances or **makespan** $\mathcal{M}$ of $\mathcal{T}$ is defined as:
+Let $\mathcal{S}$ be a schedule and let $J_j$ be the set of tasks assigned to instance $I_j$ by $\mathcal{S}$.
+Then $R_j := \sum_{k \in J_j} r_{k,j}$ is the total runtime for all jobs assigned to instance $I_j$ and is called the *load* on $I_j$.
+The maximum runtime across all instances or the *makespan* $\mathcal{M}$ of $\mathcal{S}$ is defined as:
 
 \begin{equation}\label{eq:makespandef}
 \mathcal{M} = \max_{j \in \mathcal{I}} {R_j}
 \end{equation}
 
+The makespan of a schedule represents the time taken by the schedule to complete all tasks and determines whether the tasks will be completed by the deadline.
+Therefore a feasible schedule is one whose makespan $\mathcal{M}$ is less than the deadline $\mathcal{D}$.
 
-The problem of minimizing makespan has been studied extensively [include refs here] but it cannot be solved in polynomial time because the problem is NP-hard even for the simple case of processing tasks on 2 identical instances.
-However, polynomial time approximation schemes have been developed to provide an approximate solution to this problem. One such scheme is a heuristic  called Longest Processing Time First.
-This heuristic first orders tasks in decreasing order of runtimes and then assigns the largest  task that has not yet started processing to the next available machine.
-This scheme has been shown to minimize makespan for tasks whose actual runtimes are known in advance [@Pinedo2012].
+Makespan depends on the number of tasks and the number of instances used to process tasks.
+The number of tasks is an input to the problem, so the only parameter that can be varied is the number of instances used to process the tasks.
+Makespan will be lowest when each task is processed in parallel on a separate instance and highest when all tasks are processed sequentially on the same instance.
+In both cases, cost depends on the number and type of instances used and how long each instance was used.
+
+Section \ref{SchedulingOverview} refers to the enumeration of feasible schedules and selection of the optimal schedule as separate steps.
+In the context of minimizing makespan, the number of possible schedules is so large that it is not possible to enumerate all feasible schedules in a reasonable amount of time.
+Since minimizing makespan increases the probability of completing the tasks by the deadline, we focus on trying to find the schedule with the smallest makespan while simultaneously attempting to find the schedule with the least cost.
+Finding the schedule with the smallest makespan and least cost represents an *optimization problem*.
+
+The problem of minimizing makespan for tasks with deterministic runtimes has been studied extensively and is considered to be NP-hard even for the simple case of scheduling an arbitrary number of tasks on 2 instances [@Garey1979].
+This has led to the development of various heuristics to find, in a reasonable amount of time, a schedule that is 'close enough' to the global optimum.
+One such heuristic is called Longest Processing Time First.
+This heuristic first orders tasks in decreasing order of runtimes and then assigns the largest task that has not yet started processing to the next available machine.
+It has been shown to minimize makespan for tasks whose runtimes are deterministic and known in advance [@Pinedo2012].
+
 
 * Maximizing utility
 * Benefit and MachineCost are fixed
@@ -148,6 +151,11 @@ This scheme has been shown to minimize makespan for tasks whose actual runtimes 
 \begin{equation}\label{eq:utilitydef}
 	\mathcal{U} = \mathcal{B} - \left(\sum_{i}R_{i,j}\right) \times \mathcal{C}_j
 \end{equation}
+
+
+* Easier to do when the runtimes are known in advance
+* Harder to do when runtimes are random and their distribution is unknown
+* Using Bayesian decision theory to find optimal schedule this via maximizing expected utility
 
 But task runtimes $r_{i,j}$ are not always known in advance.
 It is not uncommon to come across problems where runtime is known only when the task completes processing.
