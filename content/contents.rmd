@@ -11,36 +11,71 @@ bibliography: ucscamsms2015.bib
 
 # Introduction
 
+## Background on Cloud Computing
+
+
+A recent trend in the IT industry has been the emergence of *cloud computing* where computing infrastructure is maintained in one or more large data centers and offered for use via a network connection [@Interoute:WhatIsCloudComputing].
+The main advantages of such a setup are sharing of resources, economies of scale and flexibility to use as much or as little of the computing infrastructure as needed.
+This is in contrast to traditional computing infrastructure setups where clients have to invest in purchasing and maintaining hardware and predict future computing needs well in advance to avoid over-investing or under-investing in their infrastructure.
+Other advantages of a cloud computing setup include instant access to a vast and varied amount of computing resources, flexible pricing where the client only pays for the resources used and avoidance of a single point of failure due to the way clients access the computing infrastructure and the redundancies built in to this infrastructure.
+
+Cloud computing offerings can be classified into three broad types.
+The first type is Infrastructure-as-a-Service (IaaS) where only basic virtualized environments running on physical hardware are available.
+Everything from the operating system upwards must be installed and maintained by the client.
+This is useful when the client wants complete control over the software environment but does not want to deal with maintaining hardware or virtualized environments.
+The second type of offering is Platform-as-a-service (PaaS) where the cloud service provider offers a virtualized environment with an operating system and common software required by most applications.
+The provider takes care of maintaining and updating this software while the client focuses on building custom applications.
+The last type is Software-as-a-Service where entire software applications are offered on demand.
+In this setup, software applications are *rented* from the provider and are accessed over a network connection instead of being purchased and installed on the client's computing infrastructure.
+In all the above cases, the hardware is usually shared across multiple clients and access to hardware is abstracted away from the client.
+
+Cloud computing offerings can also be classified as *private clouds* or *public clouds*.
+Private clouds are virtualized environments that are meant for the use of a single client and are typically owned by the client.
+They cannot be accessed by anyone else.
+A public cloud, in contrast, is owned and operated by a cloud service provider and is accessed via a public network like the internet.
+It can be utilized by anyone who wants to rent infrastructure or software on demand.
+Examples of public clouds include Amazon Web Services from Amazon.com, Inc., Azure from Microsoft, Inc. and Google Cloud Platform from Google, Inc.
+This work deals only with PaaS offerings from public clouds, though the findings are equally applicable to private clouds.
+
+The availability of a large amount of computing resources on demand and ability to pay for these resources by the hour has enabled the migration of many workloads to a cloud computing environment [@RightScale:2015].
+These workloads can be processed in parallel on multiple resources and can complete much quicker than if they were processed on a single resource.
+While there is no practical constraint on the number of resources that can be used, budgetary constraints limit the number and type of resources that can be used to process a workload.
+Thus there is always a trade-off between the benefit arising from processing a workload quickly and cost of resources used to process the workload.
+
+In most cases, the benefit is a fixed value and does not vary with processing time.
+So minimizing the cost of processing will maximize the benefit to the client.
+Efficient scheduling methods help with scheduling the tasks in a workload such that the total processing cost is minimized.
+The rest of this work deals with developing efficient methods of scheduling tasks to minimize processing costs and maximize benefit.
+
+
+## Background on Scheduling
+
 Scheduling refers to the process of assigning tasks to resources that complete the tasks.
 It is a very common problem and arises in a variety of everyday situations such as scheduling manufacturing tasks in factories, scheduling takeoffs and landings of planes in airports, scheduling sports tournaments, scheduling nurse shifts in hospitals, scheduling tasks across multiple instances, etc. [@Hoos2004].
 
 The input to a scheduling problem is a set of tasks to be completed and a set of resources that can process the tasks.
-The output is a scheduling assignment that maps tasks to resources in a certain order.
-Scheduling problems are typically subject to various feasibility constraints that define a valid assignment.
+The output is a schedule that maps tasks to resources in a certain order.
+Scheduling problems are typically subject to various feasibility constraints that define a valid schedule.
 Examples of such constraints include maintaining minimum time intervals between plane takeoffs and landings, avoiding adjacent shifts for nurses, completing tasks by a certain deadline, using a fixed number of machines, etc.
-Once a set of feasible assignments is available, various optimization criteria are used select the best assignment from this set.
+Once a set of feasible schedules is available, various optimization criteria are used select the best schedule from this set.
 Examples of such criteria include minimizing total weighted delay over all flights, preference of nurses for certain shifts, minimizing maximum completion time for tasks, etc.
 
-An important characteristic of scheduling problems is that the number of feasible assignments is usually very large.
-In such cases, it is not possible to find the globally optimal assignment in a reasonable amount of time.
-In fact, most scheduling problems are considered to be NP-hard [@Garey1979] and form one of the most important classes of combinatorial problems.
-Most approaches to solving scheduling problems involve some kind of local search and try to find, in a 'reasonable' amount of time, an assignment that is 'close enough' to the global optimum. Such approaches are called Polynomial Time Approximation Schemes (PTAS) and generate a solution in polynomial time that is within $(1-\epsilon)$ of the optimal solution (for maximization problems), where $\epsilon$ is any value greater than 0.
-
-Methods used to solve scheduling problems depend on the type of problem being solved.
 Scheduling problems can be classified in various ways based on task characteristics, resource characteristics and optimization criteria [@Hoos2004, @Pinedo2012]. Properties of tasks include pre-emption, release times, deadlines, dependencies, weights, amount of pre-processing, etc.
 
 *Pre-emption* refers to the interruption of a task in progress so that it can be re-started later on the same or different resource.
-*Pre-emptive* schedules allow tasks to be interrupted while non-pre-emptive schedules do not allow pre-emption - once a task has started processing, it must complete processing on the same resource.
+*Pre-emptive* schedules allow tasks to be interrupted while *non-pre-emptive schedules* do not allow pre-emption - once a task has started processing, it must complete processing on the same resource.
 
 Tasks can be associated with release times and deadlines.
 Release time for a task represents the earliest time a task is available for processing.
 A task cannot start processing before its release time.
 A deadline represents the time by which a task must complete processing.
 When a set of tasks is associated with a deadline, all tasks in the set must complete processing by the deadline.
+Similarly, when a set of tasks has a release time, none of the tasks can begin processing before the release time.
 
 Dependencies between tasks control the order in which tasks can be processed.
 Examples of dependencies include precedence constraints between tasks where one task depends on other tasks and cannot start processing until all tasks on which it is dependent have completed.
 Task weights and the amount of pre-processing tasks have received also influence the types of schedules that can be generated.
+Tasks with higher weights must usually be processed first and tasks that have been pre-processed typically require less processing time.
 
 Scheduling problems can also be classified by the properties of resources.
 Tasks can be processed on a single resource or by multiple resources in parallel.
@@ -49,9 +84,7 @@ Identical resources are all of the same type; task runtime will be the same rega
 When using unrelated resources in parallel, runtime for a task depends on the resource used to process the task and might vary for each resource.
 
 Finally, scheduling problems can be classified by the the type of optimization criteria used to select the best schedule from a set of feasible schedules.
-Examples of such criteria include minimizing the maximum completion time (makespan) of a set of tasks, minimizing the weighted completion time of a set of tasks where each task is assigned a weight proportional to its benefit, minimizing the maximum delay of a set of tasks, etc.
-
-In this work, we focus on the problem of finding optimal non-pre-emptive schedules that minimize makespan while processing a set of tasks on multiple identical resources in parallel. All tasks have the same weight, have not undergone any pre-processing and are available for processing.
+Examples of such criteria include minimizing the maximum completion time (also known as *makespan*) of a set of tasks, minimizing the weighted completion time of a set of tasks where each task is assigned a weight proportional to its benefit, minimizing the maximum delay of a set of tasks for tasks with deadlines, etc.
 
 
 \nomenclature{$\mathcal{T}$}{Set of input tasks that must be processed}
@@ -62,16 +95,35 @@ In this work, we focus on the problem of finding optimal non-pre-emptive schedul
 \nomenclature{$R_i,j$}{Runtime of task $T_i$ on instance $I_j$; known only when $T_i$ completes processing on $I_j$; all instances of the same type are assumed to process the task in the same amount of time}
 \nomenclature{$R_j$}{Total runtime of all tasks assigned to instance $I_j$}
 \nomenclature{$\mathcal{M}$}{Makespan for the set of tasks $\mathcal{T}$}
+\nomenclature{$\mathcal{U}$}{Utility}
+\nomenclature{$\mathcal{C}_j$}{Cost per hour of instance $I_j$ (specified in dollars)}
 
 
 ## Problem Formulation
+
+The previous section highlights the need for efficient scheduling methods to complete a set of tasks on time and within budget, especially when the runtimes are distributed according to unknown probability distributions.
+Each schedule is associated with a *cost* that must be paid to the data center for use of their computing resources.
+This cost depends on the amount of time the resources are used and is determined by the *total time* taken by the schedule to complete all input tasks.
+Given a set of *feasible* schedules that can complete the set of tasks by the deadline, finding the schedule in this set that completes the task in the shortest amount of time (and therefore the lowest cost) represents an *optimization problem*.
+
+An important characteristic of scheduling problems is that the number of feasible schedules is usually very large.
+So it is not possible to find the globally optimal schedule in a reasonable amount of time using brute force methods.
+In fact, most scheduling problems are considered to be NP-hard [@Garey1979] and form one of the most important classes of combinatorial problems.
+This leads to the use of various heuristics and stochastic optimization methods to find, in a reasonable amount of time, a schedule that is 'close enough' to the global optimum.
+
+In this work, we focus on the specific problem of finding optimal non-pre-emptive schedules that minimize makespan while processing a set of tasks on multiple identical resources in parallel. All tasks have the same weight, have not undergone any pre-processing and are immediately available for processing.
+
+* Easier to do when the runtimes are known in advance
+* Harder to do when runtimes are random and their distribution is unknown
+* Using Bayesian decision theory to find optimal schedule this via maximizing expected utility
+
 
 Let $\mathcal{T} := {T_1, T_2, \dots T_n}$ be the set of input tasks that must be processed.
 This set of tasks is associated with a benefit $\mathcal{B}$ specified in dollars and a deadline $\mathcal{D}$ specified in seconds.
 Each task $T_i$ is independent of all other tasks in $\mathcal{T}$; so tasks can be processed in any order.
 $\mathcal{T}$ is considered to complete when all tasks in $\mathcal{T}$ are complete.
 
-Let $I := {I_1, I_2, \dots I_m}$ be the set of resources (also known as instances in this report) available to process tasks in $\mathcal{T}$.
+Let $I := {I_1, I_2, \dots I_m}$ be the set of resources (also known as instances in this work) available to process tasks in $\mathcal{T}$.
 These instances are grouped into various instance types depending on their configuration.
 Let $r_{i,j}$ be the runtime of task $T_i$ on instance $I_j$.
 Time taken to complete a task depends on the type of instance on which the task is processed; slower instances will take more time to process the same task compared to faster instances.
@@ -80,12 +132,22 @@ Let $J_j$ be the set of tasks assigned to instance $I_j$.
 Then $R_j := \sum_{k \in J_j} r_{k,j}$ is the total runtime for all jobs assigned to instance $I_j$.
 The maximum runtime across all instances or **makespan** $\mathcal{M}$ of $\mathcal{T}$ is defined as:
 
-$$\mathcal{M} = \max_{j \in \mathcal{I}} {R_j}$$
+\begin{equation}\label{eq:makespandef}
+\mathcal{M} = \max_{j \in \mathcal{I}} {R_j}
+\end{equation}
+
 
 The problem of minimizing makespan has been studied extensively [include refs here] but it cannot be solved in polynomial time because the problem is NP-hard even for the simple case of processing tasks on 2 identical instances.
 However, polynomial time approximation schemes have been developed to provide an approximate solution to this problem. One such scheme is a heuristic  called Longest Processing Time First.
 This heuristic first orders tasks in decreasing order of runtimes and then assigns the largest  task that has not yet started processing to the next available machine.
 This scheme has been shown to minimize makespan for tasks whose actual runtimes are known in advance [@Pinedo2012].
+
+* Maximizing utility
+* Benefit and MachineCost are fixed
+
+\begin{equation}\label{eq:utilitydef}
+	\mathcal{U} = \mathcal{B} - \left(\sum_{i}R_{i,j}\right) \times \mathcal{C}_j
+\end{equation}
 
 But task runtimes $r_{i,j}$ are not always known in advance.
 It is not uncommon to come across problems where runtime is known only when the task completes processing.
@@ -99,14 +161,19 @@ A major contribution of the current work is to present a method to minimize make
 * equation for maximizing expected utility
 * decision theory
 
-We make the following additional assumptions so that the problem is well-defined:
+\begin{equation}\label{eq:utilitydef}
+	\mathcal{U} = \mathcal{B} - \left(\sum_{i}R_{i,j}\right) \times \mathcal{C}_j
+\end{equation}
 
-*
+Utility = Benefit (\$) - Runtime (hrs) x MachineCost (\$/hr)
+* Benefit and MachineCost are fixed
+
 
 ## Data
+
 The data for this problem comprises the following:
 
-* **instance types:**
+* **Instance types:**
 Each Amazon data center has hundreds of thousands of virtual machines  (also known as instances) (ref to EC2 website) running on physical hardware.
 Each instance is associated with a certain configuration of instance type and speed, memory, local disk space, network speed, etc.
 This configuration of resources represents an instance type.
@@ -134,7 +201,9 @@ It is not practical to obtain a training set sample for all possible task length
 For the purposes of validation, two separate training sets were generated for each combination of task length and instance type.
 In the first set, the runtimes follow an exponential distribution while in the other set, they follow a Normal distribution.
 
+
 # Scoring an Assignment
+
 Finding an optimal assignment for a set of tasks requires the comparison of assignments to determine the *best* assignment.
 This comparison requires that each assignment have an associated property (which we call score) that is determined in the same way and with reference to the same baseline for all assignments.
 In this chapter, we develop the definition of such a property and show that it can be used to select the best assignment from a set of assignments.
@@ -142,18 +211,19 @@ In this chapter, we develop the definition of such a property and show that it c
 Each set of tasks is associated with a benefit $B$ (specified in units of dollars) and a deadline $D$ (specified in units of time).
 The benefit is paid out only when the all tasks are completed by the deadline. The benefit is $\$0$ if the tasks are not completed by the deadline.
 This is a constraint imposed by the submitter of the tasks and leads to a definition of score where score = the probability of the assignment allowing all tasks to be completed by the deadline.
-Thus score is a function that maps an assignment to a value in $(0,1)$.
+Thus the scoring function maps an assignment to a value in $(0,1)$ called the score.
 The higher the value of the score, the higher the probability of completing all tasks by the deadline and the higher the probability of getting the benefit.
-Since all assignments are scored against the same deadline, assignment score can be used to compare assignments and select the best assignment (i.e., assignment with the highest score).
+Since all assignments are scored against the same deadline, assignment score can be used to compare candidate assignments and select the assignment with the highest probability of getting the benefit.
 
 As mentioned in the previous chapter, we will use makespan as the optimization criterion to select the best assignment from a set of feasible assignments.
-This chapter will focus on determining makespan for a single instance and the next chapter will deal with determining makespan when multiple identical instances are used in parallel.
+This chapter will focus on scoring assignments for a single instance and the next chapter will deal with scoring assignments when multiple identical instances are used in parallel.
 
 For a single instance, makespan is the sum of actual runtimes of each task in the input set of tasks and is invariant to the order in which the tasks are processed.
-So tasks can be processed on this instance in an arbitrary order and the action space here is the set of instance types available in the data center.
-The corresponding action is the selection of the instance that maximizes the expected utility function [ref to eq in Problem formulation section].
+The action space here is the set of instance types available in the data center and the action is the selection of the instance type that maximizes the expected utility as specified in Eq \ref{eq:utilitydef}.
 
-The nature of the makespan distribution depends on the number of tasks whose runtimes are being summed.
+In Eq \ref{eq:utilitydef}, utility is averaged over the distribution of runtimes for each task. But these distributions are unknown and do not have a closed form expression. So they are determined empirically for each combination of task length and instance type by processing multiple tasks with the same length on the given instance type and recording the runtimes. The process is repeated for all task lengths of interest and series of empirical distributions are obtained.
+
+The nature of the runtime distribution depends on the number of tasks whose runtimes are being summed.
 
 
 **Overview**:
@@ -161,8 +231,6 @@ The nature of the makespan distribution depends on the number of tasks whose run
 * Aim: Assign a numerical value (score) to each candidate solution.
 * Use maxi-min criterion
 
-* Utility = Benefit (\$) - Runtime (hrs) x MachineCost (\$/hr)
-* Benefit and MachineCost are fixed
 * Need an upper bound for job runtime s.t. job will complete by this bound with
 95% probability;
 * The actual job runtime (sum of runtimes of tasks in job) must be below this
@@ -173,11 +241,10 @@ upper bound 95 times out of 100 (this is calibration)
 * Do this for all machines in the action space and pick the machine with the
 highest utility
 
-
-## Case 1: < 50 tasks/job
 * Runtime dist. generated via bootstrap sampling
 * Shape of dist. depends on number of bootstrap samples
 
+##  Validation: <= 100 tasks/instance
 
 Figure \ref{fig:bootstrap-95pct-ub-1processor-1task} shows the 95% upper bound
 on runtimes for jobs with 1 task (and processed on a single processor). Figures
@@ -206,11 +273,7 @@ Example of scheduling 1 task on 1 instance. The relevant figure is Figure
 ``` {r sched-1task-1inst, echo=FALSE, fig.cap='Caption: Schedule 1 task on 1 instance \\label{fig:sched-1task-1inst}'}
 ```
 
-##  Validation
-
-Validation for scoring assignments on a single processor when there are < 50 tasks/processor.
-
-## Case 2: > 50 tasks/job
+##  Validation: > 100 tasks/instance
 * Runtime dist. generated via Normal approx. (CLT)
 
 Figures \ref{fig:bootstrap-95pct-ub-1processor-100tasks} and
@@ -228,12 +291,8 @@ runtimes (via CLT).
 ``` {r bootstrap-95pct-ub-1processor-200tasks, echo=FALSE, message=FALSE, fig.cap='95% upper bound on runtimes for jobs with 200 tasks (runtime distribution generated by Normal approximation via CLT \\label{fig:bootstrap-95pct-ub-1processor-200tasks}'}
 ```
 
-## Validation
 
-Validation for scoring assignments on a single processor when there are > 50 tasks/processor.
-
-
-# Finding the optimal assignment
+# Finding an optimal assignment
 
 This section is about finding the optimal assignment using Simulated Annealing.
 
