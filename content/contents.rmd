@@ -49,7 +49,6 @@ The rest of this work deal with developing efficient methods of scheduling tasks
 
 ## Background on Scheduling
 
-
 \label{SchedulingOverview}
 Scheduling refers to the process of assigning tasks to resources that complete the tasks.
 It is a very common problem and arises in a variety of everyday situations such as scheduling manufacturing tasks in factories, scheduling takeoffs and landings of planes in airports, scheduling sports tournaments, scheduling nurse shifts in hospitals, scheduling tasks across multiple instances, etc. [@Hoos2004].
@@ -105,12 +104,12 @@ In this work, we focus on the problem of finding optimal non-pre-emptive schedul
 ## Problem Formulation
 
 The previous sections highlight the need for efficient scheduling methods to complete a set of tasks on time \underline{and} with the lowest possible processing cost.
-This section specifies the problem in detail and outlines a possible solution.
+This section specifies the problem in detail and suggests a possible solution.
 Subsequent sections develop this solution and show that it solves the problem in an efficient manner.
 
 Let $\mathcal{T} := {T_1, T_2, \dots T_n}$ be the set of input tasks that must be processed.
 This set of tasks is associated with a benefit $B$ specified in dollars and a deadline $D$ specified in seconds.
-Each task $T_i$ is independent of all other tasks in $\mathcal{T}$; so tasks can be processed in any order.
+Each task $T_i$ is independent of all other tasks in $\mathcal{T}$, so tasks can be processed in any order.
 $\mathcal{T}$ is considered to complete when all tasks in $\mathcal{T}$ are complete.
 
 Let $I := {I_1, I_2, \dots I_m}$ be the set of resources (also known as instances in this work) available to process tasks in $\mathcal{T}$.
@@ -119,64 +118,87 @@ Let $r_{i,j}$ be the runtime of task $T_i$ on instance $I_j$.
 Time taken to complete a task depends on the type of instance on which the task is processed; slower instances will take more time to process the same task compared to faster instances.
 Let $C_j$ be the cost per hour of instance $I_j$ (specified in dollars), with slower instances costing less than faster instances.
 
-Let $\mathcal{S}$ be a schedule and let $J_j$ be the set of tasks assigned to instance $I_j$ by $\mathcal{S}$.
-Then $R_j := \sum_{k \in J_j} r_{k,j}$ is the total runtime for all jobs assigned to instance $I_j$ and is called the *load* on $I_j$.
-The maximum runtime across all instances or the *makespan* $M$ of $\mathcal{S}$ is defined as:
+Let $S$ be a schedule and let $t_{I_j}$ be the index of the tasks in $\mathcal{T}$ assigned to instance $I_j$ by $S$.
+Then $R_j := \sum_{k \in t_{I_j}} r_{k,j}$ is the total runtime for all jobs assigned to instance $I_j$ and is called the *load* on $I_j$.
+The maximum runtime across all instances or the *makespan* $M$ of $S$ is defined as:
 
 \begin{equation}\label{eq:def:makespan}
 M = \max_{j \in \mathcal{I}} {R_j}
 \end{equation}
 
 The makespan of a schedule represents the time taken by the schedule to complete all tasks and determines whether the tasks will be completed by the deadline or not.
-Therefore, a *feasible* schedule is one whose makespan $M$ is less than the deadline $D$.
+A *feasible* schedule is defined as a schedule with $M \le D$.
 
-Makespan depends on the number of tasks and the number of instances used to process tasks.
-The number of tasks is an input to the problem, so the only parameter that can be varied is the number of instances used to process the tasks.
-Makespan will be lowest when each task is processed in parallel on a separate instance and highest when all tasks are processed sequentially on the same instance.
-In both cases, cost depends on the number and type of instances used and how long each instance was used.
+Makespan depends on the number of tasks, the number of instances and the type of instances used to process tasks.
+The number of tasks is an input to the problem, so the only parameters that can be varied are the number and type of instances.
+Makespan will be lowest when each task is processed in parallel on a separate instance of the fastest instance type and highest when all tasks are processed sequentially on a single instance of the slowest instance type.
+Processing cost depends on the number and type of instances used and the amount of time these instances were used.
 
-Section \ref{SchedulingOverview} mentions that the set of feasible schedules is first enumerated and the optimal schedule is then selected from this set.
-But the number of possible schedules is typically very large.
-*Bell number* [@mathworld:bellnumber] refers to the number of ways a set with $n$ elements can be partitioned into subsets such that each element is present in exactly one subset.
-Here each partition refers to a possible schedule.
-A set of 10 tasks can be assigned to instances into $115,975$ ways with the number of instances varying from 1 to 10.
-20 tasks result in $50 \times 10^{12}$ possible schedules on 1 to 20 instances and 100 tasks result in $~ 4 \times 10^{115}$ schedules on 1 to 100 instances.
-Even with a small number of tasks, the number of possible schedules is too large to evaluate exhaustively; so it is not possible to enumerate the subset of feasible schedules.
-
-To work around this, we combine the enumeration of feasible schedules and determination of the optimal schedule into a single step and use stochastic optimization methods to find the feasible schedule with the lowest processing cost.
-This is a multi-criteria *optimization problem* where one criterion (feasibility) is binary - a schedule either completes the tasks by the deadline or it does not - and the other criterion (processing cost) is continuous with a lower bound at 0 and an upper bound represented by the cost of processing each task on a separate instance of the most expensive instance type.
-It is important to note that a feasible schedule may not be found if the deadlines for the set of tasks are unrealistic.
-Even if the deadlines are realistic and a feasible schedule does exist, the benefit associated with a set of tasks may be lower than the cost of processing the tasks and it is cheaper to not process the tasks than to process the tasks and incur a loss.
-
-Since makespan is instance type-specific, we need to evaluate schedules on multiple instance types and select the instance type associated with a feasible schedule with the lowest processing cost.
+To find a feasible schedule with the lowest processing cost, we need to evaluate schedules on a variety of instances type and vary the number of instances used in each case.
+The number of instances that a schedule can use can vary from 1 to the number of input tasks.
+A schedule can use any instance type whose configuration satisfies the minimum requirements of the tasks.
 We simplify our situation by assuming that a schedule can only assign tasks to instances of the same type, i.e., tasks can only be assigned to, say, 5 instances of a certain type, not 3 instances of one type and 2 instances of a different type.
 This constraint leads to the identical parallel machines scheduling problem.
 It has the advantage of restricting our search space but the disadvantage of excluding schedules that might be more optimal than what we can find when we use a single instance type in a schedule.
+
+Section \ref{SchedulingOverview} mentions that the set of feasible schedules is first enumerated and the optimal schedule is then selected from this set.
+To obtain the set of feasible schedules, the makespan for all possible schedules must be calculated and compared to the deadline to determine feasibility.
+But the number of possible schedules is typically very large.
+*Bell number* [@mathworld:bellnumber] refers to the number of ways a set with $n$ elements can be partitioned into subsets such that each element is present in exactly one subset.
+Here each partition of the input set of tasks refers to a possible schedule.
+A set of 10 tasks can be assigned to instances into $115,975$ ways with the number of instances varying from 1 to 10.
+20 tasks result in $50 \times 10^{12}$ schedules on 1 to 20 instances and 100 tasks result in $~ 4 \times 10^{115}$ schedules on 1 to 100 instances.
+Thus we see that even with a small number of tasks, the number of possible schedules is too large to exhaustively evaluate for feasibility.
+So it is not possible to first enumerate the subset of feasible schedules and then select the schedule with the lowest processing cost.
+
+To work around this, we use *stochastic optimization* methods to find feasible schedules while simultaneously keeping track of their processing cost.
+Starting from an initial schedule, we determine if it is feasible.
+If it is not, we reject the schedule; if it is, we keep track of its processing cost and this schedule become the candidate solution.
+Stochastic local search methods are used to find other feasible schedules in the neighborhood of the current schedule that might have a lower processing cost.
+We continue the search in this manner until the termination criterion is met.
+When the search terminates, the feasible schedule with the lowest processing cost is the optimal schedule.
+A feasible schedule may not be found if the deadlines for the set of tasks are unrealistic.
+Even if the deadlines are realistic and a feasible schedule does exist, the benefit associated with a set of tasks may be lower than the lowest possible processing cost for the tasks and it will be more beneficial to not process the tasks than to process the tasks and incur a loss.
+To avoid these situations, we assume that the deadlines are always realistic and the benefit is higher than the lowest possible processing cost.
 
 To evaluate schedules, we adopt a *decision-theoretic* framework and *maximize utility* to select the best schedule.
 The *utility* of a schedule using $m$ instances of type $k$ can be expressed as:
 
 \begin{equation}
 \label{eq:def:utility:deterministic}
-	U_{k,m} = B - \left(\sum_{j=1}^{m}R_{j}\right) \times C_k
+	U_{k,m} = B - \left(\sum_{j=1}^{m} R_{j} \right) \times C_k
 \end{equation}
 
-where $U_{k,m}$ is the utility of a schedule using $m$ instances, each of type $k$, $B$ is the benefit derived from processing all tasks by the deadline $D$, $C_k$ is the cost per hour of an instance of type $k$ (fixed and known in advance), and $R_j$ is the total time used by instance $I_j$ of type $k$.
+where $U_{k,m}$ is the utility of a schedule using $m$ instances, each of type $k$, $B$ is the benefit derived from processing all tasks by the deadline $D$, $C_k$ is the cost per hour of an instance of type $k$ (fixed and known in advance), and $R_j$ is the total time used by instance $I_j$ of type $k$ rounded up to the next hour.
 Note that both terms on the right-hand side of Eq \ref{eq:def:utility:deterministic} are specified in the same units - $B$ in dollars, $C_k$ in dollars per hour and $R_j$ in seconds (which when converted to hours and multiplied by $C_j$ gives dollars).
 
-Since all schedules have the same benefit, this simplifies to:
+Since all schedules have the same benefit, Eq \ref{eq:def:utility:deterministic} simplifies to:
 
 \begin{equation}
 \label{eq:def:utility:deterministic:simplified}
-	U_{k,m} = - \left(\sum_{j=1}^{m}R_{j}\right) \times C_k
+	U_{k,m} = - \left(\sum_{j=1}^{m} R_{j} \right) \times C_k
 \end{equation}
+
+Utility is maximized when the term of the right in Eq \ref{eq:def:utility:deterministic:simplified} (processing cost) is as small as possible.
 
 An implicit assumption in Eq \ref{eq:def:utility:deterministic:simplified} is that the instance-level runtimes $R_j$ and task-level runtimes $r_{i,j}$ are deterministic and known in advance.
 But this is not always the case.
-It is not uncommon to come across problems where the runtime of a task is known only when the task completes processing.
-In certain cases, even the form of the probability distribution is unknown or has no closed form expression.
+It is not uncommon to find situations where the runtime of a task is known only when the task completes processing.
+In such cases, the runtimes are usually distributed according to a known probability distribution.
+Each runtime can be distributed according to a different probability distribution.
+In some cases, even the probability distribution is not known or has no closed form expression.
 In these cases, the distribution of task runtimes must be determined empirically.
-A major contribution of the current work is to present a method to minimize makespan that does not make any assumptions about the distribution of task runtimes.
+
+When runtimes are stochastic, Eq \ref{eq:def:utility:deterministic:simplified} becomes:
+
+\begin{equation}
+\label{eq:def:utility:deterministic:simplified}
+	E(U_{k,m}) = - \left(\sum_{j=1}^{m} \sum_{k \in t_{I_j}} E(r_{k,j}) \right) \times C_k
+\end{equation}
+
+where $t_{I_j}$ is the index of the tasks in $\mathcal{T}$ assigned to instance $I_j$ by $\mathcal{S}$ and we maximize *expected* utility by averaging over all possible runtimes.
+
+A major contribution of the current work is a method to find a feasible schedule with the lowest processing cost when runtimes are distributed according to an unknown probability distribution.
 
 
 ## Data
