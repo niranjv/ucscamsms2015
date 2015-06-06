@@ -230,9 +230,6 @@ So runtime distributions for a given combination of task length and instance typ
 These runtimes form the *training set* for the above combination and are used to predict runtimes for future tasks with the same length on the same instance type.
 It is not practical to obtain a training set sample for all possible task lengths, so a representative sample of 83 task lengths was selected and 200 training set runtimes were generated for each of these lengths.
 
-For the purposes of validation, two separate training sets were generated for each combination of task length and instance type.
-In the first set, the runtimes follow an exponential distribution while in the other set, they follow a Normal distribution.
-
 
 # Scoring a schedule
 
