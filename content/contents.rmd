@@ -234,26 +234,27 @@ For the purposes of validation, two separate training sets were generated for ea
 In the first set, the runtimes follow an exponential distribution while in the other set, they follow a Normal distribution.
 
 
-# Scoring an Assignment
+# Scoring a schedule
 
-Finding an optimal assignment for a set of tasks requires the comparison of assignments to determine the *best* assignment.
-This comparison requires that each assignment have an associated property (which we call score) that is determined in the same way and with reference to the same baseline for all assignments.
-In this chapter, we develop the definition of such a property and show that it can be used to select the best assignment from a set of assignments.
+
+Finding an optimal schedule for a set of tasks requires the comparison of schedules to determine the *best* schedule.
+This comparison requires that each schedule have an associated property (which we call score) that is determined in the same way and with reference to the same baseline for all schedules.
+In this chapter, we develop the definition of such a property and show that it can be used to select the best schedule from a set of schedules.
 
 Each set of tasks is associated with a benefit $B$ (specified in units of dollars) and a deadline $D$ (specified in units of time).
 The benefit is paid out only when the all tasks are completed by the deadline. The benefit is $\$0$ if the tasks are not completed by the deadline.
-This is a constraint imposed by the submitter of the tasks and leads to a definition of score where score = the probability of the assignment allowing all tasks to be completed by the deadline.
-Thus the scoring function maps an assignment to a value in $(0,1)$ called the score.
+This is a constraint imposed by the submitter of the tasks and leads to a definition of score where score = the probability of the schedule allowing all tasks to be completed by the deadline.
+Thus the scoring function maps an schedule to a value in $(0,1)$ called the score.
 The higher the value of the score, the higher the probability of completing all tasks by the deadline and the higher the probability of getting the benefit.
-Since all assignments are scored against the same deadline, assignment score can be used to compare candidate assignments and select the assignment with the highest probability of getting the benefit.
+Since all schedules are scored against the same deadline, schedule score can be used to compare candidate schedules and select the schedule with the highest probability of getting the benefit.
 
-As mentioned in the previous chapter, we will use makespan as the optimization criterion to select the best assignment from a set of feasible assignments.
-This chapter will focus on scoring assignments for a single instance and the next chapter will deal with scoring assignments when multiple identical instances are used in parallel.
+As mentioned in the previous chapter, we will use makespan as the optimization criterion to select the best schedule from a set of feasible schedules.
+This chapter will focus on scoring schedules for a single instance and the next chapter will deal with scoring schedules when multiple identical instances are used in parallel.
 
 For a single instance, makespan is the sum of actual runtimes of each task in the input set of tasks and is invariant to the order in which the tasks are processed.
-The action space here is the set of instance types available in the data center and the action is the selection of the instance type that maximizes the expected utility as specified in Eq \ref{eq:utilitydef}.
+The action space here is the set of instance types available in the data center and the action is the selection of the instance type that maximizes the expected utility as specified in Eq \ref{eq:def:utility:deterministic}.
 
-In Eq \ref{eq:utilitydef}, utility is averaged over the distribution of runtimes for each task. But these distributions are unknown and do not have a closed form expression. So they are determined empirically for each combination of task length and instance type by processing multiple tasks with the same length on the given instance type and recording the runtimes. The process is repeated for all task lengths of interest and series of empirical distributions are obtained.
+In Eq \ref{eq:def:utility:deterministic}, utility is averaged over the distribution of runtimes for each task. But these distributions are unknown and do not have a closed form expression. So they are determined empirically for each combination of task length and instance type by processing multiple tasks with the same length on the given instance type and recording the runtimes. The process is repeated for all task lengths of interest and series of empirical distributions are obtained.
 
 The nature of the runtime distribution depends on the number of tasks whose runtimes are being summed.
 
