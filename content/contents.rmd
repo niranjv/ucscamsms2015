@@ -13,7 +13,6 @@ bibliography: ucscamsms2015.bib
 
 ## Background on Cloud Computing
 
-
 A recent trend in the IT industry has been the emergence of *cloud computing* where computing infrastructure is maintained in one or more large data centers and offered for use via a network connection [@Interoute:WhatIsCloudComputing].
 The main advantages of such a setup are sharing of resources, economies of scale and flexibility to use as much or as little of the computing infrastructure as needed.
 This is in contrast to traditional computing infrastructure setups where clients have to invest in purchasing and maintaining hardware and predict future computing needs well in advance to avoid over-investing or under-investing in their infrastructure.
@@ -30,10 +29,10 @@ In this setup, software applications are *rented* from the provider and are acce
 In all the above cases, the hardware is usually shared across multiple clients and access to hardware is abstracted away from the client.
 
 Cloud computing offerings can also be classified as *private clouds* or *public clouds*.
-Private clouds are virtualized environments that are meant for the use of a single client and are typically owned by the client.
+Private clouds are virtualized environments that are meant for the use of a single client and are accessed via a secure, private network connection.
 They cannot be accessed by anyone else.
-A public cloud, in contrast, is owned and operated by a cloud service provider and is accessed via a public network like the internet.
-It can be utilized by anyone who wants to rent infrastructure or software on demand.
+A public cloud, in contrast, is owned and operated by a cloud service provider and can be utilized by anyone who wants to rent infrastructure or software on demand
+It is accessed via a public network like the internet.
 Examples of public clouds include Amazon Web Services from Amazon.com, Inc., Azure from Microsoft, Inc. and Google Cloud Platform from Google, Inc.
 This work deals only with PaaS offerings from public clouds, though the findings are equally applicable to private clouds.
 
@@ -42,15 +41,16 @@ These workloads can be processed in parallel on multiple resources and can compl
 While there is no practical constraint on the number of resources that can be used, budgetary constraints limit the number and type of resources that can be used to process a workload.
 Thus there is always a trade-off between the benefit arising from processing a workload quickly and cost of resources used to process the workload.
 
-In most cases, the benefit is a fixed value and does not vary with processing time.
-So minimizing the cost of processing will maximize the benefit to the client.
-Efficient scheduling methods help with scheduling the tasks in a workload such that the total processing cost is minimized.
-The rest of this work deals with developing efficient methods of scheduling tasks to minimize processing costs and maximize benefit.
+In most cases, the benefit is a fixed value and depends on the tasks in the workload being completed by a given deadline.
+It does not increase if the tasks are completed earlier but it will not be paid out if all tasks are not completed by the deadline.
+The only way for the client to get the maximum benefit is to complete all tasks by the deadline with the lowest possible processing costs.
+The rest of this work deal with developing efficient methods of scheduling tasks in parallel on multiple resources to achieve this goal.
 
 
 ## Background on Scheduling
-\label{SchedulingOverview}
 
+
+\label{SchedulingOverview}
 Scheduling refers to the process of assigning tasks to resources that complete the tasks.
 It is a very common problem and arises in a variety of everyday situations such as scheduling manufacturing tasks in factories, scheduling takeoffs and landings of planes in airports, scheduling sports tournaments, scheduling nurse shifts in hospitals, scheduling tasks across multiple instances, etc. [@Hoos2004].
 
@@ -64,14 +64,14 @@ Examples of such criteria include minimizing total weighted delay over all fligh
 Scheduling problems can be classified in various ways based on task characteristics, resource characteristics and optimization criteria [@Hoos2004, @Pinedo2012]. Properties of tasks include pre-emption, release times, deadlines, dependencies, weights, amount of pre-processing, etc.
 
 *Pre-emption* refers to the interruption of a task in progress so that it can be re-started later on the same or different resource.
-*Pre-emptive* schedules allow tasks to be interrupted while *non-pre-emptive schedules* do not allow pre-emption - once a task has started processing, it must complete processing on the same resource.
+*Pre-emptive* schedules allow tasks to be interrupted while *non-pre-emptive schedules* do not allow pre-emption - once a task has started processing on a certain resource, it must complete processing on the same resource.
 
 Tasks can be associated with release times and deadlines.
 Release time for a task represents the earliest time a task is available for processing.
 A task cannot start processing before its release time.
 A deadline represents the time by which a task must complete processing.
-When a set of tasks is associated with a deadline, all tasks in the set must complete processing by the deadline.
-Similarly, when a set of tasks has a release time, none of the tasks can begin processing before the release time.
+When a set of tasks is associated with a release time, none of the tasks can begin processing before the release time.
+Similarly, when a set of tasks is associated with a deadline, all tasks in the set must complete processing by the deadline.
 
 Dependencies between tasks control the order in which tasks can be processed.
 Examples of dependencies include precedence constraints between tasks where one task depends on other tasks and cannot start processing until all tasks on which it is dependent have completed.
@@ -85,96 +85,98 @@ Identical resources are all of the same type; task runtime will be the same rega
 When using unrelated resources in parallel, runtime for a task depends on the resource used to process the task and might vary for each resource.
 
 Finally, scheduling problems can be classified by the the type of optimization criteria used to select the best schedule from a set of feasible schedules.
-Examples of such criteria include minimizing the maximum completion time (also known as *makespan*) of a set of tasks, minimizing the weighted completion time of a set of tasks where each task is assigned a weight proportional to its benefit, minimizing the maximum delay of a set of tasks for tasks with deadlines, etc.
+Examples of such criteria include minimizing the maximum completion time (also known as *makespan*) of a set of tasks, minimizing the weighted completion time of a set of tasks where each task is assigned a weight proportional to its benefit, minimizing the maximum delay of a set of tasks, if the tasks are associated with a deadline, etc.
 
-In this work, we focus on the specific problem of finding optimal non-pre-emptive schedules that minimize makespan while processing a set of tasks on multiple identical resources in parallel. All tasks have the same weight, have not undergone any pre-processing and are immediately available for processing.
+In this work, we focus on the problem of finding optimal non-pre-emptive schedules that minimize makespan while processing a set of tasks on multiple identical resources in parallel. All tasks have the same weight, have not undergone any pre-processing and are immediately available for processing.
 
-
+\nomenclature{$\mathcal{I}$}{Set of instances available to process tasks. Each instance is associated with a *type* and a cost $C$.}
 \nomenclature{$\mathcal{T}$}{Set of input tasks that must be processed}
-\nomenclature{$\mathcal{B}$}{Benefit (specified in dollars) paid out when all tasks in $T$ are completed by the deadline. If {$\mathcal{T}$} is not complete by the deadline, $\mathcal{B}=\$0$.}
-\nomenclature{$\mathcal{D}$}{Deadline (specified in seconds) by which all tasks in $\mathcal{T}$ must complete processing}
-\nomenclature{$\mathcal{I}$}{Set of instances available to process tasks}
+\nomenclature{$B$}{Benefit (specified in dollars) paid out when all tasks in $T$ are completed by the deadline. If {$\mathcal{T}$} is not complete by the deadline, $B=\$0$.}
+\nomenclature{$D$}{Deadline (specified in seconds) by which all tasks in $\mathcal{T}$ must complete processing}
 \nomenclature{$L_i$}{Length of task $T_i$}
 \nomenclature{$R_i,j$}{Runtime of task $T_i$ on instance $I_j$; known only when $T_i$ completes processing on $I_j$; all instances of the same type are assumed to process the task in the same amount of time}
 \nomenclature{$R_j$}{Total runtime of all tasks assigned to instance $I_j$}
-\nomenclature{$\mathcal{M}$}{Makespan for the set of tasks $\mathcal{T}$}
-\nomenclature{$\mathcal{U}$}{Utility}
-\nomenclature{$\mathcal{C}_j$}{Cost per hour of instance $I_j$ (specified in dollars)}
+\nomenclature{$M$}{Makespan for the set of tasks $\mathcal{T}$}
+\nomenclature{$C_j$}{Cost per hour of instance $I_j$ (specified in dollars/hour)}
+\nomenclature{$S$}{A schedule that maps tasks to resources that can process the tasks}
+\nomenclature{$U_{k,m}$}{Utility of a schedule using $m$ instances of type $k$}
 
 
 ## Problem Formulation
 
 The previous sections highlight the need for efficient scheduling methods to complete a set of tasks on time \underline{and} with the lowest possible processing cost.
-This section specifies the problem in detail while subsequent sections develop methods to solve the problem in an efficient manner.
+This section specifies the problem in detail and outlines a possible solution.
+Subsequent sections develop this solution and show that it solves the problem in an efficient manner.
 
 Let $\mathcal{T} := {T_1, T_2, \dots T_n}$ be the set of input tasks that must be processed.
-This set of tasks is associated with a benefit $\mathcal{B}$ specified in dollars and a deadline $\mathcal{D}$ specified in seconds.
+This set of tasks is associated with a benefit $B$ specified in dollars and a deadline $D$ specified in seconds.
 Each task $T_i$ is independent of all other tasks in $\mathcal{T}$; so tasks can be processed in any order.
 $\mathcal{T}$ is considered to complete when all tasks in $\mathcal{T}$ are complete.
 
 Let $I := {I_1, I_2, \dots I_m}$ be the set of resources (also known as instances in this work) available to process tasks in $\mathcal{T}$.
 These instances are grouped into various instance types depending on their configuration.
 Let $r_{i,j}$ be the runtime of task $T_i$ on instance $I_j$.
-Time taken to complete a task depends on the type of instance on which the task is processed; slower instances will take more time to process the same task compared to faster instances. Let $C_j$ be the cost per hour of instance $I_j$ (specified in dollars).
+Time taken to complete a task depends on the type of instance on which the task is processed; slower instances will take more time to process the same task compared to faster instances.
+Let $C_j$ be the cost per hour of instance $I_j$ (specified in dollars), with slower instances costing less than faster instances.
 
 Let $\mathcal{S}$ be a schedule and let $J_j$ be the set of tasks assigned to instance $I_j$ by $\mathcal{S}$.
 Then $R_j := \sum_{k \in J_j} r_{k,j}$ is the total runtime for all jobs assigned to instance $I_j$ and is called the *load* on $I_j$.
-The maximum runtime across all instances or the *makespan* $\mathcal{M}$ of $\mathcal{S}$ is defined as:
+The maximum runtime across all instances or the *makespan* $M$ of $\mathcal{S}$ is defined as:
 
-\begin{equation}\label{eq:makespandef}
-\mathcal{M} = \max_{j \in \mathcal{I}} {R_j}
+\begin{equation}\label{eq:def:makespan}
+M = \max_{j \in \mathcal{I}} {R_j}
 \end{equation}
 
-The makespan of a schedule represents the time taken by the schedule to complete all tasks and determines whether the tasks will be completed by the deadline.
-Therefore a feasible schedule is one whose makespan $\mathcal{M}$ is less than the deadline $\mathcal{D}$.
+The makespan of a schedule represents the time taken by the schedule to complete all tasks and determines whether the tasks will be completed by the deadline or not.
+Therefore, a *feasible* schedule is one whose makespan $M$ is less than the deadline $D$.
 
 Makespan depends on the number of tasks and the number of instances used to process tasks.
 The number of tasks is an input to the problem, so the only parameter that can be varied is the number of instances used to process the tasks.
 Makespan will be lowest when each task is processed in parallel on a separate instance and highest when all tasks are processed sequentially on the same instance.
 In both cases, cost depends on the number and type of instances used and how long each instance was used.
 
-Section \ref{SchedulingOverview} refers to the enumeration of feasible schedules and selection of the optimal schedule as separate steps.
-In the context of minimizing makespan, the number of possible schedules is so large that it is not possible to enumerate all feasible schedules in a reasonable amount of time.
-Since minimizing makespan increases the probability of completing the tasks by the deadline, we focus on trying to find the schedule with the smallest makespan while simultaneously attempting to find the schedule with the least cost.
-Finding the schedule with the smallest makespan and least cost represents an *optimization problem*.
+Section \ref{SchedulingOverview} mentions that the set of feasible schedules is first enumerated and the optimal schedule is then selected from this set.
+But the number of possible schedules is typically very large.
+*Bell number* [@mathworld:bellnumber] refers to the number of ways a set with $n$ elements can be partitioned into subsets such that each element is present in exactly one subset.
+Here each partition refers to a possible schedule.
+A set of 10 tasks can be assigned to instances into $115,975$ ways with the number of instances varying from 1 to 10.
+20 tasks result in $50 \times 10^{12}$ possible schedules on 1 to 20 instances and 100 tasks result in $~ 4 \times 10^{115}$ schedules on 1 to 100 instances.
+Even with a small number of tasks, the number of possible schedules is too large to evaluate exhaustively; so it is not possible to enumerate the subset of feasible schedules.
 
-The problem of minimizing makespan for tasks with deterministic runtimes has been studied extensively and is considered to be NP-hard even for the simple case of scheduling an arbitrary number of tasks on 2 instances [@Garey1979].
-This has led to the development of various heuristics to find, in a reasonable amount of time, a schedule that is 'close enough' to the global optimum.
-One such heuristic is called Longest Processing Time First.
-This heuristic first orders tasks in decreasing order of runtimes and then assigns the largest task that has not yet started processing to the next available machine.
-It has been shown to minimize makespan for tasks whose runtimes are deterministic and known in advance [@Pinedo2012].
+To work around this, we combine the enumeration of feasible schedules and determination of the optimal schedule into a single step and use stochastic optimization methods to find the feasible schedule with the lowest processing cost.
+This is a multi-criteria *optimization problem* where one criterion (feasibility) is binary - a schedule either completes the tasks by the deadline or it does not - and the other criterion (processing cost) is continuous with a lower bound at 0 and an upper bound represented by the cost of processing each task on a separate instance of the most expensive instance type.
+It is important to note that a feasible schedule may not be found if the deadlines for the set of tasks are unrealistic.
+Even if the deadlines are realistic and a feasible schedule does exist, the benefit associated with a set of tasks may be lower than the cost of processing the tasks and it is cheaper to not process the tasks than to process the tasks and incur a loss.
 
+Since makespan is instance type-specific, we need to evaluate schedules on multiple instance types and select the instance type associated with a feasible schedule with the lowest processing cost.
+We simplify our situation by assuming that a schedule can only assign tasks to instances of the same type, i.e., tasks can only be assigned to, say, 5 instances of a certain type, not 3 instances of one type and 2 instances of a different type.
+This constraint leads to the identical parallel machines scheduling problem.
+It has the advantage of restricting our search space but the disadvantage of excluding schedules that might be more optimal than what we can find when we use a single instance type in a schedule.
 
-* Maximizing utility
-* Benefit and MachineCost are fixed
+To evaluate schedules, we adopt a *decision-theoretic* framework and *maximize utility* to select the best schedule.
+The *utility* of a schedule using $m$ instances of type $k$ can be expressed as:
 
-\begin{equation}\label{eq:utilitydef}
-	\mathcal{U} = \mathcal{B} - \left(\sum_{i}R_{i,j}\right) \times \mathcal{C}_j
+\begin{equation}
+\label{eq:def:utility:deterministic}
+	U_{k,m} = B - \left(\sum_{j=1}^{m}R_{j}\right) \times C_k
 \end{equation}
 
+where $U_{k,m}$ is the utility of a schedule using $m$ instances, each of type $k$, $B$ is the benefit derived from processing all tasks by the deadline $D$, $C_k$ is the cost per hour of an instance of type $k$ (fixed and known in advance), and $R_j$ is the total time used by instance $I_j$ of type $k$.
+Note that both terms on the right-hand side of Eq \ref{eq:def:utility:deterministic} are specified in the same units - $B$ in dollars, $C_k$ in dollars per hour and $R_j$ in seconds (which when converted to hours and multiplied by $C_j$ gives dollars).
 
-* Easier to do when the runtimes are known in advance
-* Harder to do when runtimes are random and their distribution is unknown
-* Using Bayesian decision theory to find optimal schedule this via maximizing expected utility
+Since all schedules have the same benefit, this simplifies to:
 
-But task runtimes $r_{i,j}$ are not always known in advance.
-It is not uncommon to come across problems where runtime is known only when the task completes processing.
-But the probability distribution of runtimes is known before processing starts and PTAS have been developed to find approximate solutions to such problems.
-When the runtimes are exponentially distributed, the Longest *Expected* Processing Time First heuristic has been shown to minimize the *expected* makespan [@Pinedo2012].
-This heuristic first sorts tasks in decreasing order of expected runtime and then assigns the largest task that has not yet started processing to the next available machine. The proof of this heuristic uses the memory-less property of exponential distributions and hence this heuristic is not applicable to cases where the runtimes are not exponentially distributed.
+\begin{equation}
+\label{eq:def:utility:deterministic:simplified}
+	U_{k,m} = - \left(\sum_{j=1}^{m}R_{j}\right) \times C_k
+\end{equation}
 
+An implicit assumption in Eq \ref{eq:def:utility:deterministic:simplified} is that the instance-level runtimes $R_j$ and task-level runtimes $r_{i,j}$ are deterministic and known in advance.
+But this is not always the case.
+It is not uncommon to come across problems where the runtime of a task is known only when the task completes processing.
+In certain cases, even the form of the probability distribution is unknown or has no closed form expression.
+In these cases, the distribution of task runtimes must be determined empirically.
 A major contribution of the current work is to present a method to minimize makespan that does not make any assumptions about the distribution of task runtimes.
-
-* Maximizing expected utility
-* equation for maximizing expected utility
-* decision theory
-
-\begin{equation}\label{eq:utilitydef}
-	\mathcal{U} = \mathcal{B} - \left(\sum_{i}R_{i,j}\right) \times \mathcal{C}_j
-\end{equation}
-
-Utility = Benefit (\$) - Runtime (hrs) x MachineCost (\$/hr)
-* Benefit and MachineCost are fixed
 
 
 ## Data
