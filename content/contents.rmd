@@ -89,7 +89,9 @@ Examples of such criteria include minimizing the maximum completion time (also k
 In this work, we focus on the problem of finding optimal non-pre-emptive schedules that minimize makespan while processing a set of tasks on multiple identical resources in parallel. All tasks have the same weight, have not undergone any pre-processing and are immediately available for processing.
 
 \nomenclature{$\mathcal{I}$}{Set of instances available to process tasks. Each instance is associated with a *type* and a cost $C$.}
+\nomenclature{$\mathcal{P}$}{Set of instance types that can process tasks in $\mathcal{T}$}
 \nomenclature{$\mathcal{T}$}{Set of input tasks that must be processed}
+
 \nomenclature{$B$}{Benefit (specified in dollars) paid out when all tasks in $T$ are completed by the deadline. If {$\mathcal{T}$} is not complete by the deadline, $B=\$0$.}
 \nomenclature{$D$}{Deadline (specified in seconds) by which all tasks in $\mathcal{T}$ must complete processing}
 \nomenclature{$L_i$}{Length of task $T_i$}
@@ -119,10 +121,17 @@ Time taken to complete a task depends on the type of instance on which the task 
 Let $C_j$ be the cost per hour of instance $I_j$ (specified in dollars), with slower instances costing less than faster instances.
 
 Let $S$ be a schedule and let $t_{I_j}$ be the index of the tasks in $\mathcal{T}$ assigned to instance $I_j$ by $S$.
-Then $R_j := \sum_{k \in t_{I_j}} r_{k,j}$ is the total runtime for all jobs assigned to instance $I_j$ and is called the *load* on $I_j$.
-The maximum runtime across all instances or the *makespan* $M$ of $S$ is defined as:
+The total runtime $R_j$ for all jobs assigned to instance $I_j$ is called the  *load* on instance $I_j$ and is defined as
 
-\begin{equation}\label{eq:def:makespan}
+\begin{equation}
+\label{eq:def:load}
+R_j = \sum_{k \in t_{I_j}} r_{k,j}
+\end{equation}
+
+The maximum runtime across all instances or the *makespan* $M$ of $S$ is then defined as:
+
+\begin{equation}
+\label{eq:def:makespan}
 M = \max_{j \in \mathcal{I}} {R_j}
 \end{equation}
 
@@ -192,7 +201,7 @@ In these cases, the distribution of task runtimes must be determined empirically
 When runtimes are stochastic, Eq \ref{eq:def:utility:deterministic:simplified} becomes:
 
 \begin{equation}
-\label{eq:def:utility:deterministic:simplified}
+\label{eq:def:utility:stochastic}
 	E(U_{k,m}) = - \left(\sum_{j=1}^{m} \sum_{k \in t_{I_j}} E(r_{k,j}) \right) \times C_k
 \end{equation}
 
