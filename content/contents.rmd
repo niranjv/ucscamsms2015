@@ -161,7 +161,7 @@ A feasible schedule may not be found if the deadlines for the set of tasks are u
 Even if the deadlines are realistic and a feasible schedule does exist, the benefit associated with a set of tasks may be lower than the lowest possible processing cost for the tasks and it will be more beneficial to not process the tasks than to process the tasks and incur a loss.
 To avoid these situations, we assume that the deadlines are always realistic and the benefit is higher than the lowest possible processing cost.
 
-To evaluate schedules, we adopt a *decision-theoretic* framework and *maximize utility* to select the best schedule.
+To evaluate feasible schedules, we adopt a *decision-theoretic* framework and *maximize utility* to select the best schedule.
 The *utility* of a schedule using $m$ instances of type $k$ can be expressed as:
 
 \begin{equation}
@@ -169,7 +169,7 @@ The *utility* of a schedule using $m$ instances of type $k$ can be expressed as:
 	U_{k,m} = B - \left(\sum_{j=1}^{m} R_{j} \right) \times C_k
 \end{equation}
 
-where $U_{k,m}$ is the utility of a schedule using $m$ instances, each of type $k$, $B$ is the benefit derived from processing all tasks by the deadline $D$, $C_k$ is the cost per hour of an instance of type $k$ (fixed and known in advance), and $R_j$ is the total time used by instance $I_j$ of type $k$ rounded up to the next hour.
+where $U_{k,m}$ is the utility of a schedule using $m$ instances, each of type $k$, $B$ is the benefit derived from processing all tasks by the deadline $D$, $C_k$ is the cost per hour of an instance of type $k$ (fixed and known in advance), and $R_j$ is the total time used by instance $I_j$ of type $k$, rounded up to the next hour.
 Note that both terms on the right-hand side of Eq \ref{eq:def:utility:deterministic} are specified in the same units - $B$ in dollars, $C_k$ in dollars per hour and $R_j$ in seconds (which when converted to hours and multiplied by $C_j$ gives dollars).
 
 Since all schedules have the same benefit, Eq \ref{eq:def:utility:deterministic} simplifies to:
@@ -184,10 +184,10 @@ Utility is maximized when the term of the right in Eq \ref{eq:def:utility:determ
 An implicit assumption in Eq \ref{eq:def:utility:deterministic:simplified} is that the instance-level runtimes $R_j$ and task-level runtimes $r_{i,j}$ are deterministic and known in advance.
 But this is not always the case.
 It is not uncommon to find situations where the runtime of a task is known only when the task completes processing.
-In such cases, the runtimes are usually distributed according to a known probability distribution.
+In such cases, the runtimes are usually distributed according to a probability distribution that is known in advance.
 Each runtime can be distributed according to a different probability distribution.
-In some cases, even the probability distribution is not known or has no closed form expression.
-In these cases, the distribution of task runtimes must be determined empirically.
+In some cases, even the form of the probability distribution is not known or has no closed form expression.
+In these cases, the distribution of task runtimes must be determined empirically as described in the next section.
 
 When runtimes are stochastic, Eq \ref{eq:def:utility:deterministic:simplified} becomes:
 
@@ -196,13 +196,14 @@ When runtimes are stochastic, Eq \ref{eq:def:utility:deterministic:simplified} b
 	E(U_{k,m}) = - \left(\sum_{j=1}^{m} \sum_{k \in t_{I_j}} E(r_{k,j}) \right) \times C_k
 \end{equation}
 
-where $t_{I_j}$ is the index of the tasks in $\mathcal{T}$ assigned to instance $I_j$ by $\mathcal{S}$ and we maximize *expected* utility by averaging over all possible runtimes.
+where $t_{I_j}$ is the index of the tasks in $\mathcal{T}$ assigned to instance $I_j$ by $\mathcal{S}$, $E(U_{k,m})$ is the expected utility of a schedule using $m$ instances of type $k$ and we maximize *expected* utility by averaging over all possible runtimes.
 
-A major contribution of the current work is a method to find a feasible schedule with the lowest processing cost when runtimes are distributed according to an unknown probability distribution.
+Schedules for tasks with stochastic runtimes have stochastic makespans that have their own probability distribution. In this case, we relax our definition of feasibility so that any schedule with a makespan whose 95th percentile is $\le D$ is considered feasible. A major contribution of the current work is a method to find a feasible schedule with the lowest processing cost when tasks have stochastic runtimes that are distributed according to unknown probability distributions.
 
 
 ## Data
 
+\label{Data}
 The data for this problem comprises the following:
 
 * **Instance types:**
@@ -211,8 +212,8 @@ Each instance is associated with a certain configuration of instance type and sp
 This configuration of resources represents an instance type.
 Examples of instance types include compute-optimized instance types with faster, more powerful instances, memory-optimized instance types with large amounts of memory, storage-optimized instance types with large amounts of local disk space, etc.
 There are dozens of such instance types and thousands of instances of the same type in each data center.
-The instance types represent the action space of the decision problem with selection of an instance type to process input types being the corresponding action.
-In this work, we assume that tasks are constrained only by instance type and speed and not by any other resource.
+The instance types and the number of instances of a certain type represent the action space of the decision problem.
+In this work, we assume that tasks are constrained only by processor speed and not by any other resource.
 
 * **Task lengths**:
 The input to the problem is a set of tasks.
@@ -224,36 +225,41 @@ But these properties are not easily quantifiable, so task runtime is considered 
 
 * **Training set samples:**
 In addition to task length, task runtime also depends on the instance type on which the task is processed.
-Distributions for task runtimes follow arbitrary unknown distributions that cannot be expressed in closed form.
-Further, runtimes for different task lengths can follow potentially different unknown distributions.
+Task runtimes are assumed to follow unknown distributions that cannot be expressed in closed form and the distribution for each combination of instance type and task length can be different.
 So runtime distributions for a given combination of task length and instance type are determined empirically by running multiple tasks of the same length on the instance type and recording the actual runtime for each task.
 These runtimes form the *training set* for the above combination and are used to predict runtimes for future tasks with the same length on the same instance type.
 It is not practical to obtain a training set sample for all possible task lengths, so a representative sample of 83 task lengths was selected and 200 training set runtimes were generated for each of these lengths.
 
 
-# Scoring a schedule
+# The single instance case
 
+This chapter focuses on selecting optimal feasible schedules when processing tasks on a single resource while the next chapter deals with the case of processing tasks on multiple identical resources in parallel.
 
-Finding an optimal schedule for a set of tasks requires the comparison of schedules to determine the *best* schedule.
-This comparison requires that each schedule have an associated property (which we call score) that is determined in the same way and with reference to the same baseline for all schedules.
-In this chapter, we develop the definition of such a property and show that it can be used to select the best schedule from a set of schedules.
+Eq \ref{eq:def:makespan} defines the makespan of a schedule as the maximum load across all instances used by the schedule.
+When a schedule processes tasks sequentially on a single instance, makespan of the schedule is the same as the load on this instance.
+It is invariant to the order in which tasks are processed on the instance.
+Since the number of instances is fixed at 1, the action space is reduced to the set of instance types that result in feasible schedules and the action is the selection of the instance type that results in a feasible schedule and maximizes (expected) utility.
 
-Each set of tasks is associated with a benefit $B$ (specified in units of dollars) and a deadline $D$ (specified in units of time).
-The benefit is paid out only when the all tasks are completed by the deadline. The benefit is $\$0$ if the tasks are not completed by the deadline.
-This is a constraint imposed by the submitter of the tasks and leads to a definition of score where score = the probability of the schedule allowing all tasks to be completed by the deadline.
-Thus the scoring function maps an schedule to a value in $(0,1)$ called the score.
-The higher the value of the score, the higher the probability of completing all tasks by the deadline and the higher the probability of getting the benefit.
-Since all schedules are scored against the same deadline, schedule score can be used to compare candidate schedules and select the schedule with the highest probability of getting the benefit.
+When task runtimes are deterministic and known in advance, makespan $M$ of a schedule $S$ using instance type $k$ is just the sum of the runtimes for $k$.
+If $M \le $ deadline $D$, then $S$ is feasible and the utility $U_{k,1}$ is calculated for these instance types as shown in Eq \ref{eq:def:utility:deterministic:simplified} with $m=1$.
+Utility is calculated in this manner for each instance type in the action space.
+The feasible schedule with the maximum utility represents the solution to the problem.
+All tasks should be processed on the instance type associated with this schedule and they will complete in $M$ seconds.
 
-As mentioned in the previous chapter, we will use makespan as the optimization criterion to select the best schedule from a set of feasible schedules.
-This chapter will focus on scoring schedules for a single instance and the next chapter will deal with scoring schedules when multiple identical instances are used in parallel.
+Since $M$ is the sum of runtimes, if runtimes are stochastic, then $M$ is itself a random variable with an associated probability distribution.
+This distribution of $M$ depends on the number of runtimes that are being summed.
+Tasks in $\mathcal{T}$ are assumed to be independent and represent a random sample from the population of tasks.
+The same therefore applies to the runtimes of these tasks.
+If the number of tasks or, equivalently, runtimes, is a large enough number, say, 100, then the Central Limit Theorem (CLT) will apply and $M$ will have a *Normal* distribution.
+The mean and variance of the Normal distribution will equal the sum of the means and variances, respectively, of the individual runtime distributions.
 
-For a single instance, makespan is the sum of actual runtimes of each task in the input set of tasks and is invariant to the order in which the tasks are processed.
-The action space here is the set of instance types available in the data center and the action is the selection of the instance type that maximizes the expected utility as specified in Eq \ref{eq:def:utility:deterministic}.
-
-In Eq \ref{eq:def:utility:deterministic}, utility is averaged over the distribution of runtimes for each task. But these distributions are unknown and do not have a closed form expression. So they are determined empirically for each combination of task length and instance type by processing multiple tasks with the same length on the given instance type and recording the runtimes. The process is repeated for all task lengths of interest and series of empirical distributions are obtained.
-
-The nature of the runtime distribution depends on the number of tasks whose runtimes are being summed.
+If the number of tasks is not large enough for the CLT to apply, then the distribution of $M$ is determined via bootstrap resampling [ref to bootstrap].
+A value is randomly sampled from the distribution of runtimes of each of the input tasks.
+These values are then summed to give a value for makespan and the value is recorded.
+This process is repeated a large number of times, resulting in a bootstrap distribution for makespan for the current schedule and instance type.
+If the distribution of runtimes is unknown or does not have a closed form expression, a value must be sampled from the empirical distribution for runtime.
+The empirical runtime distribution for a task with length $l$ on instance type $k$ is determined as specified in section \ref{Data} by processing a number of samples of tasks with length $l$ on an instance of type $k$ and recording the runtimes.
+This set of runtimes represents the empirical runtime distribution for a task with length $l$ when processed on an instance of type $k$.
 
 
 **Overview**:
@@ -322,7 +328,7 @@ runtimes (via CLT).
 ```
 
 
-# Finding an optimal assignment
+# The multiple instance case
 
 This section is about finding the optimal assignment using Simulated Annealing.
 
