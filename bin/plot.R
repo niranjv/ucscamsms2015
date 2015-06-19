@@ -9,7 +9,7 @@ rm(list=ls())
 # simulated annealing code. This is done only once for each new version of
 # schedulr
 #
-# install.packages(devtools)
+# install.packages("devtools")
 # devtools::install_github('niranjv/schedulr', ref='develop')
 
 # load schedulr & setup exponential runtimes dataset
@@ -502,9 +502,10 @@ plot.validation.results <- function (
     outliers.pct <-
     round(100*NROW(outliers)/NROW(validation.results.matched),2)
 
-    img.title <- paste('95% CI for makespann',
-    NROW(validation.results), ' trials; ', num.tasks, ' tasks/trial\n',
-    outliers.pct, '% outliers in the ',
+    img.title <- paste('95% CI for makespan\n', sep='')
+    img.title <- paste(img.title, NROW(validation.results), ' trials; ', 
+        num.tasks, ' tasks/trial\n', sep='')
+    img.title <- paste(img.title, outliers.pct, '% outliers in the ',
     round(100*NROW(validation.results.matched)/NROW(validation.results),2),
     '% of trials with matched instance types', sep='')
 
@@ -540,7 +541,7 @@ plot.validation.results <- function (
 
 # ---- 1instance-deterministic-runtimes ----
 
-# Calculate makespan for detemrinistic runtimes
+# Calculate makespan for deterministic runtimes
 benefit <- 30 # in dollars
 deadline <- 25 # in hours
 runtimes <- matrix(nrow=5, ncol=3)
@@ -551,150 +552,58 @@ runtimes[,3] = 0.74 * runtimes[,1]
 result = get.schedule.deterministic.runtimes(instance.types, cost, benefit,
   deadline, runtimes)
 
-cat ('Instance type "', result$max.util.instance.type,
-'" has the maximum utility of $', result$max.util, ' with a makespan of ',
-result$max.util.makespan, ' hrs\n', sep='')
-
-
 
 # ---- 1instance-stochastic-runtimes-known-dist-100tasks ----
 start.time <- proc.time()
-validate.stochastic.runtimes(
-  instance.types=instance.types,
-  instance.costs=instance.costs,
-  num.tasks=100)
+validate.stochastic.runtimes(instance.types, instance.costs, num.tasks=100)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-250tasks ----
 start.time <- proc.time()
-validate.stochastic.runtimes(
-  instance.types=instance.types,
-  instance.costs=instance.costs,
-  num.tasks=250)
+validate.stochastic.runtimes(instance.types, instance.costs, num.tasks=250)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-500tasks ----
 start.time <- proc.time()
-validate.stochastic.runtimes(
-  instance.types=instance.types,
-  instance.costs=instance.costs,
-  num.tasks=500)
+validate.stochastic.runtimes(instance.types, instance.costs, num.tasks=500)
  cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-1000tasks ----
 start.time <- proc.time()
-validate.stochastic.runtimes(
-  instance.types=instance.types,
-  instance.costs=instance.costs,
-  num.tasks=1000)
+validate.stochastic.runtimes(instance.types, instance.costs, num.tasks=1000)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
   
 
 # ---- 1instance-stochastic-runtimes-known-dist-10tasks ----
 start.time <- proc.time()
-validate.stochastic.runtimes.bootstrap(
-  instance.types, instance.costs,
+validate.stochastic.runtimes.bootstrap(instance.types, instance.costs,
   num.tasks=10)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-20tasks ----
 start.time <- proc.time()
-validate.stochastic.runtimes.bootstrap(
-  instance.types=instance.types, instance.costs=instance.costs,
+validate.stochastic.runtimes.bootstrap(instance.types, instance.costs,
   num.tasks=20)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-25tasks ----
 start.time <- proc.time()
-validate.stochastic.runtimes.bootstrap(
-  instance.types=instance.types, instance.costs=instance.costs,
+validate.stochastic.runtimes.bootstrap(instance.types, instance.costs,
   num.tasks=25)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-50tasks ----
 start.time <- proc.time()
-validate.stochastic.runtimes.bootstrap(
-  instance.types=instance.types, instance.costs=instance.costs,
+validate.stochastic.runtimes.bootstrap(instance.types, instance.costs,
   num.tasks=50)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-75tasks ----
 start.time <- proc.time()
-validate.stochastic.runtimes.bootstrap(
-  instance.types=instance.types, instance.costs=instance.costs,
+validate.stochastic.runtimes.bootstrap(instance.types, instance.costs,
   num.tasks=75)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
-# ---- 1instance-stochastic-runtimes-known-dist-100tasks ----
-start.time <- proc.time()
-validate.stochastic.runtimes.bootstrap(
-  instance.types=instance.types, instance.costs=instance.costs,
-  num.tasks=100)
-cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
-
-
-# ---- sched-1task-1inst ----
-job <- c(1)
-deadline <- 300
-cluster.instance.type <- 'm3xlarge'
-cluster.size <- 1
-max.iter <- 10
-max.temp <- 0.5
-reset.score.pct <- 10
-
-best.schedule <- schedule(job, deadline, cluster.instance.type, cluster.size,
-max.iter, max.temp, reset.score.pct, debug=TRUE)
-scores.ts <- attr(best.schedule, 'scores.ts')
-
-img.title <- 'Probability of completing job by deadline'
-plot(scores.ts[,1], scores.ts[,2], type='l', ylim=c(0,1), xlab='Iteration',
-ylab='Score', main=img.title)
-lines(scores.ts[,1], scores.ts[,5], type='l', col='#e41a1c')
-grid()
-
-
-# ---- sched-3task-2inst ----
-job <- c(1,60,100)
-deadline <- 300
-cluster.instance.type <- 'm3xlarge'
-cluster.size <- 2
-max.iter <- 10
-max.temp <- 100
-reset.score.pct <- 10
-
-best.schedule <- schedule(job, deadline, cluster.instance.type, cluster.size,
-max.iter, max.temp, reset.score.pct, debug=TRUE)
-scores.ts <- attr(best.schedule, 'scores.ts')
-
-img.title <- 'Probability of completing job by deadline'
-plot(scores.ts[,1], scores.ts[,2], type='l', ylim=c(0,1), xlab='Iteration',
-ylab='Score', main=img.title)
-lines(scores.ts[,1], scores.ts[,5], type='l', col='#e41a1c')
-grid()
-
-
-# ---- sched-113task-4inst ----
-job <- c(1,2,2,2,3,3,4,4,5,10,10,10,15,15,15,25,25,25,25,25,30,35,35,35,40,40,45,50,50,50,55,65,70,75,75,80,85,85,95,95,95,100,110,115,125,130,135,150,155,155,155,155,155,165,170,170,175,180,185,185,190,190,195,220,220,230,230,250,250,275,300,300,300,300,325,325,350,350,375,400,450,450,500,550,550,650,650,800,900,900,900,950,1000,1300,1300,1300,1500,1600,1700,1700,1700,1800,1900,1900,1900,2000,2200,2300,2500,2600,2700,2800,2900)
-deadline <- 3000
-cluster.instance.type <- 'm3xlarge'
-cluster.size <- 4
-max.iter <- 100
-max.temp <- 10
-reset.score.pct <- 10
-
-best.schedule <- schedule(job, deadline, cluster.instance.type, cluster.size,
-max.iter, max.temp, reset.score.pct, debug=TRUE)
-
-leptf.schedule <- get.initial.schedule(cluster.size, job, rts, 'leptf')
-leptf.schedule <- get.score(leptf.schedule, rt, rts, deadline)
-
-plot(attr(best.schedule, 'score'), attr(leptf.schedule, 'score'),
-main='Probability of completing tasks by deadline', xlab='Predicted',
-ylab='LEPT')
-
-plot(attr(best.schedule, 'processing.cost'),
-attr(leptf.schedule, 'processing.cost'),
-main='Cost of processing tasks by deadline ($)', xlab='Predicted', ylab='LEPT')
 
 
 
