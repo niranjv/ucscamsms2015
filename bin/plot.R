@@ -3,11 +3,16 @@
 
 
 # ---- init ----
-# Install devtools and use devtools to install schedulr from GitHub
+rm(list=ls())
+
+# Install devtools and use devtools to install schedulr from GitHub to run
+# simulated annealing code. This is done only once for each new version of
+# schedulr
+#
 # install.packages(devtools)
 # devtools::install_github('niranjv/schedulr', ref='develop')
 
-# load schedulr & setup training set data
+# load schedulr & setup exponential runtimes dataset
 library(schedulr)
 
 data(m3xlarge.runtimes.expdist)
@@ -18,289 +23,524 @@ rts <- get('m3xlarge.runtimes.summary', envir=data.env)
 
 # init vars
 
-# assume 3 instance types with:
-# A slower than B slower than C
-# A cheaper than B cheaper than C
-instance.types <- letters[1:3]
+# assume 3 instance types available
+# e.g., (m3.large, c3.large, c4.large) in AWS EC2 with:
+# processing speed = (3.25, 3.5, 4)
+# processing cost = (0.14, 0.105, 0.116)
+instance.types <- c('m3.large', 'c3.large', 'c4.large')
+instance.speed <- c(3.25, 3.5, 4)
+instance.costs <- c(0.14, 0.105, 0.116)
 
-cost.a <- 1 # dollars/hour
-cost <- c(cost.a, 1.1*cost.a, 1.3*cost.a)
 
-
-# define functions
-
-create.validation.data <- function(runtimes.dist) {
+#' Create validation dataset
+#'
+#' Runtime for each tasks can have a different distribution
+#' Input array has the name of the distribution of the runtime for each task
+#'
+#' @param runtimes.dist Array of strings representing the distribution of
+#' runtimes. Currently, the distributions must be one of
+#' ('unif', 'poisson', 'gamma', 'exp').
+#' @return A list containing the details of the distribution of runtimes for
+#' each task in the input set of tasks
+create.validation.data <- function (runtimes.dist) {
 
     num.tasks <- NROW(runtimes.dist)
+    num.instance.types = NROW(instance.types)
 
-    actual.runtimes <- matrix(nrow=num.tasks, ncol=3)
-    colnames(actual.runtimes) <- paste('runtimes.', instance.types, sep='')
+    simulated.runtimes <- matrix(nrow=num.tasks, ncol=num.instance.types)
+    colnames(simulated.runtimes) <- paste('runtimes.', instance.types, sep='')
 
-    means <- matrix(nrow=num.tasks, ncol=3)
-    vars <- matrix(nrow=num.tasks, ncol=3)
+    means <- matrix(nrow=num.tasks, ncol=num.instance.types)
+    vars <- matrix(nrow=num.tasks, ncol=num.instance.types)
     dist.params <- list()
 
+    runtimes <- 1 + (1:length(runtimes.dist))/60 # baseline for params
     for(i in 1:length(runtimes.dist)) {
+
+      param.a <- runtimes[i] * instance.speed[1]
+      param.b <- runtimes[i] * instance.speed[2]
+      param.c <- runtimes[i] * instance.speed[3]
 
       # Discrete Uniform
       if (runtimes.dist[i] == 'unif') {
 
-        means[i,1] <- (1+i)/2
-        means[i,2] <- means[i,1] - 0.07 * means[i,1]
-        means[i,3] <- means[i,1] - 0.26 * means[i,1]
+        means[i,1] <- (1+param.a)/2
+        means[i,2] <- (1+param.b)/2
+        means[i,3] <- (1+param.c)/2
 
-        actual.runtimes[i,1] <- runif(1, 1, i)
-        actual.runtimes[i,2] <- actual.runtimes[i,1] - 0.07 * means[i,1]
-        actual.runtimes[i,3] <- actual.runtimes[i,1] - 0.26 * means[i,1]
+        simulated.runtimes[i,1] <- runif(1, 1, param.a)
+        simulated.runtimes[i,2] <- runif(1, 1, param.b)
+        simulated.runtimes[i,3] <- runif(1, 1, param.c)
 
-        vars[i,1] <- ((i-1)^2)/12
-        vars[i,2] <- vars[i,1]
-        vars[i,3] <- vars[i,1]
+        vars[i,1] <- ((param.a-1)^2)/12
+        vars[i,2] <- ((param.b-1)^2)/12
+        vars[i,3] <- ((param.c-1)^2)/12
 
-        dist.params[[i]] <- list('dist'='unif', 'i'=i)
+        dist.params[[i]] <- list('dist'='unif', 'params'=c(param.a, param.b,
+          param.c))
       }
 
       # Gamma
       if (runtimes.dist[i] == 'gamma') {
 
-        means[i,1 ] <- i*(2/i)
-        means[i,2] <- means[i,1] - 0.07 * means[i,1]
-        means[i,3] <- means[i,1] - 0.26 * means[i,1]
+        means[i,1] <- param.a^2
+        means[i,2] <- param.b^2
+        means[i,3] <- param.c^2
 
-        actual.runtimes[i,1] <- rgamma(1, shape=i, scale=2/i)
-        actual.runtimes[i,2] <- actual.runtimes[i,1] - 0.07 * means[i,1]
-        actual.runtimes[i,3] <- actual.runtimes[i,1] - 0.26 * means[i,1]
+        simulated.runtimes[i,1] <- rgamma(1, shape=param.a, scale=param.a)
+        simulated.runtimes[i,2] <- rgamma(1, shape=param.b, scale=param.b)
+        simulated.runtimes[i,3] <- rgamma(1, shape=param.c, scale=param.c)
 
-        vars[i] <- i*(2/i)^2
-        vars[i,2] <- vars[i,1]
-        vars[i,3] <- vars[i,1]
+        vars[i,1] <- param.a^3
+        vars[i,2] <- param.b^3
+        vars[i,3] <- param.c^3
 
-        dist.params[[i]] <- list('dist'='gamma', 'shape'=i, 'scale'=2/i)
+        dist.params[[i]] <- list('dist'='gamma', 'params'=c(param.a, param.b,
+          param.c))
       }
-
 
       # Poisson
       if (runtimes.dist[i] == 'poisson') {
 
-        means[i,1] <- i
-        means[i,2] <- means[i,1] - 0.07 * means[i,1]
-        means[i,3] <- means[i,1] - 0.26 * means[i,1]
+        param.a <- round(param.a)
+        param.b <- round(param.b)
+        param.c <- round(param.c)
 
-        actual.runtimes[i,1] <- rpois(1, i)
-        actual.runtimes[i,2] <- actual.runtimes[i,1] - 0.07 * means[i,1]
-        actual.runtimes[i,3] <- actual.runtimes[i,1] - 0.26 * means[i,1]
+        means[i,1] <- param.a
+        means[i,2] <- param.b
+        means[i,3] <- param.c
 
-        vars[i,1] <- i
-        vars[i,2] <- vars[i,1]
-        vars[i,3] <- vars[i,1]
+        simulated.runtimes[i,1] <- rpois(1, param.a)
+        simulated.runtimes[i,2] <- rpois(1, param.b)
+        simulated.runtimes[i,3] <- rpois(1, param.c)
 
-        dist.params[[i]] <- list('dist'='poisson', 'i'=i)
+        vars[i,1] <- param.a
+        vars[i,2] <- param.b
+        vars[i,3] <- param.c
+
+        dist.params[[i]] <- list('dist'='poisson', 'params'=c(param.a, param.b,
+          param.c))
       }
 
       # Exponential
       if (runtimes.dist[i] == 'exp') {
 
-        means[i,1] <- 1/i
-        means[i,2] <- means[i,1] - 0.07 * means[i,1]
-        means[i,3] <- means[i,1] - 0.26 * means[i,1]
+        means[i,1] <- 1/param.a
+        means[i,2] <- 1/param.b
+        means[i,3] <- 1/param.c
 
-        actual.runtimes[i,1] <- rexp(1, i)
-        actual.runtimes[i,2] <- actual.runtimes[i,1] - 0.07 * means[i,1]
-        actual.runtimes[i,3] <- actual.runtimes[i,1] - 0.26 * means[i,1]
+        simulated.runtimes[i,1] <- rexp(1, param.a)
+        simulated.runtimes[i,2] <- rexp(1, param.b)
+        simulated.runtimes[i,3] <- rexp(1, param.c)
 
-        vars[i] <- 1/(i^2)
-        vars[i,2] <- vars[i,1]
-        vars[i,3] <- vars[i,1]
+        vars[i,1] <- 1/(param.a^2)
+        vars[i,2] <- 1/(param.b^2)
+        vars[i,3] <- 1/(param.c^2)
 
-        dist.params[[i]] <- list('dist'='exp', 'i'=i)
+        dist.params[[i]] <- list('dist'='exp', 'params'=c(param.a, param.b,
+          param.c))
       }
     }
 
     return(list(
-      'actual.runtimes' = actual.runtimes,
+      'simulated.runtimes' = simulated.runtimes,
       'means' = means,
       'vars' = vars,
       'dist.params' = dist.params
     ))
+    
 } # end function - create.validation.data
 
-get.schedule.deterministic.runtimes <-
-function(instance.types, cost, benefit, deadline, runtimes) {
 
-  makespan <- ceiling(apply(runtimes, 2, sum))
-  makespan.feasible <- makespan[makespan <= deadline]
-  cost.feasible <- cost[makespan <= deadline]
-  instance.types.feasible <- instance.types[makespan <= deadline]
+#' Calculate makespan for deterministic runtimes
+#'
+#' For deterministic runtimes, load is the sum of runtimes of tasks assigned
+#' to an instance and makespan is the max of load across all instances.
+#'
+#' @param instance.types Array of instance types under consideration
+#' @param instance.costs Array of cost per hour for above instance types
+#' @param benefit Benefit of completing all tasks by deadline
+#' @param deadline Time by which all costs must be complete
+#' @param runtimes Deterministic runtimes for all tasks for all instance types
+#' @return A list containing the maximum utility and the instance type and
+#' makespan associated with this utility
+get.schedule.deterministic.runtimes <- function (
+instance.types, instance.costs, benefit, deadline, runtimes) {
 
-  util.feasible <- benefit - (cost.feasible * makespan.feasible)
-  max.util <- max(util.feasible)
-  max.util.instance.type <- instance.types.feasible[which.max(util.feasible)]
-  max.util.makespan <- makespan.feasible[which.max(util.feasible)]
+    makespan <- ceiling(apply(runtimes, 2, sum))
+    makespan.feasible <- makespan[makespan <= deadline]
+    instance.costs.feasible <- instance.costs[makespan <= deadline]
+    instance.types.feasible <- instance.types[makespan <= deadline]
 
-  return(list(
-    'max.util' = max.util,
-    'max.util.instance.type' = max.util.instance.type,
-    'max.util.makespan' = max.util.makespan
-  ))
+    util.feasible <- benefit - (instance.costs.feasible * makespan.feasible)
+    max.util.idx <- which.max(util.feasible)
+    max.util <- util.feasible[max.util.idx]
+    max.util.instance.type <- instance.types.feasible[max.util.idx]
+    max.util.makespan <- makespan.feasible[max.util.idx]
+
+    return( list(
+      'max.util' = max.util,
+      'max.util.instance.type' = max.util.instance.type,
+      'max.util.makespan' = max.util.makespan
+    ))
 
 } # end function - get.schedule.deterministic.runtimes
 
 
-get.schedule.stochastic.runtimes <-
-function(instance.types, cost, benefit, deadline, means, vars, threshold.pct) {
+#' Calculate schedule for large number of tasks whose runtimes are distributed
+#' according to known distributions
+#'
+#' @param instance.types Array of instance types under consideration
+#' @param instance.costs Array of cost per hour for above instance types
+#' @param benefit Benefit of completing all tasks by deadline
+#' @param deadline Time by which all costs must be complete
+#' @param means Array of means of runtime distributions
+#' @param vars Array of variances of runtime distributions
+#' @param feasible.pctl Percentile of makespan distribution. A schedule is 
+#' feasible only if the deadline is greater than this percentile of the 
+#' makespan distribution
+#' @return A list containing the maximum utility, instance type and details of 
+#' the makespan associated with this utility
+get.schedule.stochastic.runtimes <- function (
+  instance.types, instance.costs, benefit, deadline, means, vars,
+  feasible.pctl) {
 
-  stopifnot(dim(means) == dim(vars))
+    stopifnot(dim(means) == dim(vars))
 
-  means.sum <- apply(means, 2, sum)
-  vars.sum <- apply(vars, 2, sum)
-  sds <- sqrt(vars.sum)
+    means.sum <- apply(means, 2, sum)
+    vars.sum <- apply(vars, 2, sum)
+    sds <- sqrt(vars.sum)
 
-  makespan.a.pct <- qnorm(threshold.pct, means.sum[1], sds[1])
-  makespan.b.pct <- qnorm(threshold.pct, means.sum[2], sds[2])
-  makespan.c.pct <- qnorm(threshold.pct, means.sum[3], sds[3])
+    makespan.pctl <- qnorm(feasible.pctl, means.sum, sds)
+    makespan.pctl <- ceiling(makespan.pctl)
 
-  makespan.pct <- ceiling(c(
-    makespan.a.pct,
-    makespan.b.pct,
-    makespan.c.pct
-  ))
+    feasible.idx <- makespan.pctl <= deadline
+    makespan.feasible <- makespan.pctl[feasible.idx]
+    instance.cost.feasible <- instance.costs[feasible.idx]
+    instance.types.feasible <- instance.types[feasible.idx]
 
-  makespan.feasible <- makespan.pct[makespan.pct <= deadline]
-  cost.feasible <- cost[makespan.pct <= deadline]
-  instance.types.feasible <- instance.types[makespan.pct <= deadline]
+    util.feasible <- benefit - (instance.cost.feasible * makespan.feasible)
+    max.util <- max(util.feasible)
+    max.util.idx <- which.max(util.feasible)
 
-  util.feasible <- benefit - (cost.feasible * makespan.feasible)
-  max.util <- max(util.feasible)
-  max.idx <- which.max(util.feasible)
+    max.util.instance.type <- instance.types.feasible[max.util.idx]
+    max.util.makespan.feasible.pctl <- makespan.feasible[max.util.idx]
 
-  max.util.instance.type <- instance.types.feasible[max.idx]
-  max.util.makespan.threshold.pct <- makespan.feasible[max.idx]
+    # assuming we are summing over enough tasks that the makespn dist. is Normal
+    max.util.makespan.mean <- means.sum[max.util.idx]
+    max.util.makespan.sd <- sds[max.util.idx]
+    max.util.makespan.lo <- max.util.makespan.mean - 1.96 * max.util.makespan.sd
+    max.util.makespan.hi <- max.util.makespan.mean + 1.96 * max.util.makespan.sd
 
-  max.util.makespan.mean <- means.sum[max.idx]
-  max.util.makespan.sd <- sds[max.idx]
-  max.util.makespan.lo <- max.util.makespan.mean - 1.96 * max.util.makespan.sd
-  max.util.makespan.hi <- max.util.makespan.mean + 1.96 * max.util.makespan.sd
-
-  return(list(
-    'max.util' = max.util,
-    'max.util.instance.type' = max.util.instance.type,
-    'max.util.makespan.threshold.pct' = max.util.makespan.threshold.pct,
-    'max.util.makespan.mean' = max.util.makespan.mean,
-    'max.util.makespan.lo' = max.util.makespan.lo,
-    'max.util.makespan.hi' = max.util.makespan.hi
-  ))
+    return(list(
+        'max.util' = max.util,
+        'max.util.instance.type' = max.util.instance.type,
+        'max.util.makespan.feasible.pctl' = max.util.makespan.feasible.pctl,
+        'max.util.makespan.mean' = max.util.makespan.mean,
+        'max.util.makespan.lo' = max.util.makespan.lo,
+        'max.util.makespan.hi' = max.util.makespan.hi
+    ))
 
 } # end function - get.schedule.stochastic.runtimes
 
 
-get.schedule.stochastic.runtimes.bootstrap <-
-function(instance.types, cost, benefit, deadline, dist.params, bootstrap.reps, threshold.pct) {
+#' Get validation results when makespan distributions are Normally distributed
+#'
+#' @param instance.types Array of instance types under consideration
+#' @param instance.costs Array of cost per hour for above instance types
+#' @param feasible.pctl Percentile of makespan distribution. A schedule is 
+#' feasible only if the deadline is greater than this percentile of the 
+#' makespan distribution
+#' @param num.tasks Number of input tasks
+#' @param num.trials Number of simulated data sets to process
+#' @return Nothing. This function generates a plot as a side-effect
+validate.stochastic.runtimes <- function (
+  instance.types, instance.costs, feasible.pctl=0.95,
+  num.tasks, num.trials=1000) {
 
-  num.tasks <- length(dist.params)
+  validation.results <- data.frame()
 
-  makespan.bootstrap.dist <- matrix(nrow=bootstrap.reps, ncol=length(instance.types))
+  for (j in 1:num.trials) {
 
-  for (i in 1:bootstrap.reps) {
+    # cat('Processing iteration', j, '\n')
 
-    cur.dist <- matrix(nrow=num.tasks, ncol=3)
+    dist <- c('unif', 'poisson', 'gamma', 'exp')
+    runtimes.dist <- sample(dist, num.tasks, replace=T)
+    validation.data <- create.validation.data(runtimes.dist)
+
+    # a realistic benefit & deadline or no schedule will be found
+    deadline = round(4 * sum(validation.data$simulated.runtimes[,1]))
+    benefit = deadline
+
+    result.actual = get.schedule.deterministic.runtimes(
+      instance.types, instance.costs, benefit, deadline,
+      validation.data$simulated.runtimes
+    )
+
+    result.predicted = get.schedule.stochastic.runtimes(
+      instance.types, instance.costs, benefit,
+      deadline, validation.data$means,
+      validation.data$vars, feasible.pctl
+    )
+
+    validation.results[j, 1] <- result.actual$max.util
+    validation.results[j, 2] <- result.actual$max.util.instance.type
+    validation.results[j, 3] <- result.actual$max.util.makespan
+
+    validation.results[j, 4] <- result.predicted$max.util
+    validation.results[j, 5] <- result.predicted$max.util.instance.type
+    validation.results[j, 6] <- result.predicted$max.util.makespan.mean
+    validation.results[j, 7] <- result.predicted$max.util.makespan.lo
+    validation.results[j, 8] <- result.predicted$max.util.makespan.hi
+  }
+
+  validation.results <- validation.results[order(validation.results[,7]),]
+  validation.results <- cbind(1:NROW(validation.results), validation.results)
+  colnames(validation.results) <- c('index', 'actual.util', 'actual.inst',
+  'actual.makespan', 'pred.util', 'pred.inst', 'pred.makespan.mean',
+  'pred.makespan.lo', 'pred.makespan.hi')
+
+  plot.validation.results(validation.results, num.tasks, num.trials)
+
+}
+
+
+get.runtime.dist.bootstrap <- function (
+    num.instance.types, dist.params) {
+    
+    num.tasks <- length(dist.params)
+    
+    runtime.dist <- matrix(nrow=num.tasks,
+      ncol=num.instance.types)
 
     for (j in 1:num.tasks) {
+        dist.type <- dist.params[[j]]$dist
+        params <- dist.params[[j]]$params
+        stopifnot(num.instance.types <= length(params))
 
-      dist.type <- dist.params[[j]]$dist
+        # Discrete Uniform
+        if (dist.type == 'unif') {
+          runtime.dist[j,] <- runif(num.instance.types, min=1, max=params)
+        }
 
-      # Discrete Uniform
-      if (dist.type == 'unif') {
+        # Gamma
+        if (dist.type == 'gamma') {
+            runtime.dist[j,] <- rgamma(num.instance.types, shape=params, 
+                scale=params)
+        }
 
-        b <- dist.params[[j]]$i
+        # Poisson
+        if (dist.type == 'poisson') {
+            runtime.dist[j,] <- rpois(num.instance.types, lambda=params)
+        }
 
-        cur.dist[j,1] <- runif(1, 1, b)
-        cur.dist[j,2] <- cur.dist[j,1] - 0.07 * cur.dist[j,1]
-        cur.dist[j,3] <- cur.dist[j,1] - 0.26 * cur.dist[j,1]
-      }
-
-      # Gamma
-      if (dist.type == 'gamma') {
-
-        shape = dist.params[[j]]$shape
-        scale = dist.params[[j]]$scale
-
-        cur.dist[j,1] <- rgamma(1, shape=shape, scale=scale)
-        cur.dist[j,2] <- cur.dist[j,1] - 0.07 * cur.dist[j,1]
-        cur.dist[j,3] <- cur.dist[j,1] - 0.26 * cur.dist[j,1]
-      }
-
-      # Poisson
-      if (dist.type == 'poisson') {
-
-        b <- dist.params[[j]]$i
-
-        cur.dist[j,1] <- rpois(1, b)
-        cur.dist[j,2] <- cur.dist[j,1] - 0.07 * cur.dist[j,1]
-        cur.dist[j,3] <- cur.dist[j,1] - 0.26 * cur.dist[j,1]
-
-      }
-
-      # Exponential
-      if (dist.type == 'exp') {
-
-        b <- dist.params[[j]]$i
-
-        cur.dist[j,1] <- rexp(1, b)
-        cur.dist[j,2] <- cur.dist[j,1] - 0.07 * cur.dist[j,1]
-        cur.dist[j,3] <- cur.dist[j,1] - 0.26 * cur.dist[j,1]
-      }
+        # Exponential
+        if (dist.type == 'exp') {
+            runtime.dist[j,] <- rexp(num.instance.types, rate=params)
+        }
 
     } # loop over dist. for all tasks
 
-    makespan.bootstrap.dist[i, 1] <- sum(cur.dist[,1])
-    makespan.bootstrap.dist[i, 2] <- sum(cur.dist[,2])
-    makespan.bootstrap.dist[i, 3] <- sum(cur.dist[,3])
 
-  } # end for - loop over all bootstrap reps
+    return (runtime.dist)
+        
+} # end function - get.runtime.dist.bootstrap
 
 
-  means <- apply(makespan.bootstrap.dist, 2, mean)
+#' Get runtime dist via bootstrap resampling, then get schedule
+#'
+#' @param instance.types Array of instance types under consideration
+#' @param instance.costs Array of cost per hour for above instance types
+#' @param num.tasks Number of input tasks
+#' @param num.trials Number of simulated data sets to process
+#' @param num.bootstrap.reps Number of bootstrap samples to use while generating
+#' runtime distribution
+#' @param feasible.pctl Threshold to use to detemine makespan for runtime dist.
+#' @return Nothing. This function generates a plot as a side-effect
+get.schedule.stochastic.runtimes.bootstrap <- function (
+  instance.types, instance.costs, benefit, deadline, dist.params,
+  num.bootstrap.reps, feasible.pctl) {
+    
+    num.instance.types <- length(instance.types)
+    
+    makespan.bootstrap.dist <- 
+        matrix(nrow=num.bootstrap.reps, ncol=num.instance.types)
 
-  makespan.a.pct <- quantile(makespan.bootstrap.dist[,1], prob=threshold.pct)
-  makespan.b.pct <- quantile(makespan.bootstrap.dist[,2], prob=threshold.pct)
-  makespan.c.pct <- quantile(makespan.bootstrap.dist[,3], prob=threshold.pct)
+    for (i in 1:num.bootstrap.reps) {
+        
+        if (1 %% 10 == 0) { cat('Processing trial', i, '\n') }
+      
+        runtime.dist <- get.runtime.dist.bootstrap(num.instance.types,
+            dist.params)
+        makespan.bootstrap.dist[i,] <- apply(runtime.dist, 2, sum)
+    }
 
-  makespan.pct <- ceiling(c(
-    makespan.a.pct,
-    makespan.b.pct,
-    makespan.c.pct
-  ))
+    makespan.pct <- 
+        apply(makespan.bootstrap.dist, 2, quantile, prob=feasible.pctl)
+    makespan.pct <- ceiling(makespan.pct)
 
     makespan.feasible <- makespan.pct[makespan.pct <= deadline]
-    cost.feasible <- cost[makespan.pct <= deadline]
+    instance.cost.feasible <- instance.costs[makespan.pct <= deadline]
     instance.types.feasible <- instance.types[makespan.pct <= deadline]
 
-    util.feasible <- benefit - (cost.feasible * makespan.feasible)
-    max.util <- max(util.feasible)
-    max.idx <- which.max(util.feasible)
+    util.feasible <- benefit - (instance.cost.feasible * makespan.feasible)
+    max.util.idx <- which.max(util.feasible)
 
-    max.util.instance.type <- instance.types.feasible[max.idx]
-    max.util.makespan.threshold.pct <- makespan.feasible[max.idx]
-    max.util.makespan.dist <- makespan.bootstrap.dist[,max.idx]
 
-    max.util.makespan.mean <- means[max.idx]
-    max.util.makespan.lo <- quantile(max.util.makespan.dist, prob=0.025)
-    max.util.makespan.hi <- quantile(max.util.makespan.dist, prob=0.975)
-
-  return(list(
-    'max.util' = max.util,
-    'max.util.instance.type' = max.util.instance.type,
-    'max.util.makespan.threshold.pct' = max.util.makespan.threshold.pct,
-    'max.util.makespan.mean' = max.util.makespan.mean,
-    'max.util.makespan.lo' = max.util.makespan.lo,
-    'max.util.makespan.hi' = max.util.makespan.hi
-  ))
+    return(list(
+    'makespan.feasible' = makespan.feasible,
+    'util.feasible' = util.feasible,
+    'max.util' = util.feasible[max.util.idx],
+    'max.util.dist' = makespan.bootstrap.dist[,max.util.idx],
+    'max.util.instance.type' = instance.types.feasible[max.util.idx],
+    'max.util.makespan.feasible.pctl' = makespan.feasible[max.util.idx],
+    'max.util.makespan.mean' = mean(makespan.bootstrap.dist[,max.util.idx]),
+    'max.util.makespan.var' = var(makespan.bootstrap.dist[,max.util.idx]),
+    'max.util.makespan.lo' = quantile(makespan.bootstrap.dist[,max.util.idx],
+      prob=0.025),
+    'max.util.makespan.hi' = quantile(makespan.bootstrap.dist[,max.util.idx],
+      prob=0.975)
+    ))
 
 } # end function - get.schedule.stochastic.runtimes.bootstrap
 
 
+#' Get validation results when runtime distributions are obtained via bootstrap
+#' sampling
+#'
+#' @param instance.types Array of instance types under consideration
+#' @param instance.costs Array of cost per hour for above instance types
+#' @param num.tasks Number of input tasks
+#' @param num.trials Number of simulated data sets to process
+#' @param num.bootstrap.reps Number of bootstrap samples to use while generating
+#' runtime distribution
+#' @param feasible.pctl Threshold to use to detemine makespan for runtime dist.
+#' @return Nothing. This function generates a plot as a side-effect
+validate.stochastic.runtimes.bootstrap <- function (
+    instance.types, instance.costs, num.tasks, num.trials=1000,
+    num.bootstrap.reps=1000, feasible.pctl=0.95) {
+
+    validation.results <- data.frame()
+
+    for (j in 1:num.trials) {
+
+        if (j %% 100 == 0) { cat('Processing trial', j, '\n') }
+
+        dist.list <- c('unif', 'poisson', 'gamma', 'exp')
+        runtimes.dist <- sample(dist.list, num.tasks, replace=T)
+        runtimes.dist <- rep('poisson', num.tasks)
+        validation.data <- create.validation.data(runtimes.dist)
+
+        # a realistic benefit & deadline or no schedule will be found
+        deadline = round(4 * sum(validation.data$simulated.runtimes[,1]))
+        benefit = deadline
+
+        # this is the makespan if the runtimes were deterministic
+        result.actual = get.schedule.deterministic.runtimes(
+          instance.types, instance.costs, benefit, deadline,
+          validation.data$simulated.runtimes
+        )
+
+        result.predicted = get.schedule.stochastic.runtimes.bootstrap(
+          instance.types, instance.costs, benefit, deadline,
+          validation.data$dist.params, num.bootstrap.reps, feasible.pctl
+        )
+
+        validation.results[j,1] <- result.actual$max.util
+        validation.results[j,2] <- result.actual$max.util.instance.type
+        validation.results[j,3] <- result.actual$max.util.makespan
+
+        validation.results[j,4] <- result.predicted$max.util
+        validation.results[j,5] <- result.predicted$max.util.instance.type
+        validation.results[j,6] <- result.predicted$max.util.makespan.mean
+        validation.results[j,7] <- result.predicted$max.util.makespan.lo
+        validation.results[j,8] <- result.predicted$max.util.makespan.hi
+    }
+
+    validation.results <- validation.results[order(validation.results[,7]),]
+    validation.results <- cbind(1:NROW(validation.results), validation.results)
+    colnames(validation.results) <- c('index', 'actual.util', 'actual.inst',
+    'actual.makespan', 'pred.util', 'pred.inst', 'pred.makespan.mean',
+    'pred.makespan.lo', 'pred.makespan.hi')
+
+    plot.validation.results(validation.results, num.tasks, num.trials)
+
+} # end function - validate.stochastic.runtimes.bootstrap
+
+
+#' Plot validation results
+#'
+#' Plot actual runtimes with 95% CI for predicted runtimes
+#'
+#' @param validation.results Matrix containing the columns (
+#'  Actual maximum utility,
+#'  Actual instance with maximum utility,
+#'  Actual makespan with maximum utility,
+#'  Predicted maximum utility,
+#'  Predicted instance type with maximum utility,
+#'  Mean of predicted makespan with maximum utility,
+#'  Lower bound of 95% CI of predicted makespan with maximum utility,
+#'  Higher bound of 95% CI of predicted makespan with maximum utility,
+#' )
+#' @param img.title Title to use in image
+#' @param img.filename Path to image file
+#' @return Nothing. This function is called for the side-effect of generating
+#' a plot in a file.
+plot.validation.results <- function (
+  validation.results, num.tasks, num.trials) {
+      
+    # We can compare runtimes only when both the actual and predicted schedules
+    # use the same instance type
+    validation.results.matched <-
+    subset(validation.results, validation.results[,3] == validation.results[,6])
+
+    outliers <- subset(validation.results.matched,
+        validation.results.matched[,4] < validation.results.matched[,8] |
+        validation.results.matched[,4] > validation.results.matched[,9]
+    )
+    
+    outliers.pct <-
+    round(100*NROW(outliers)/NROW(validation.results.matched),2)
+
+    img.title <- paste('95% CI for makespann',
+    NROW(validation.results), ' trials; ', num.tasks, ' tasks/trial\n',
+    outliers.pct, '% outliers in the ',
+    round(100*NROW(validation.results.matched)/NROW(validation.results),2),
+    '% of trials with matched instance types', sep='')
+
+    img.filename <- paste('validate-stochastic-runtimes-',
+    num.trials,'-trials-', num.tasks,'-tasks.eps', sep='')
+
+    y.lim <- round(range(validation.results[,c(4,8,9)]))
+
+    img.dir <- 'content/figures';
+    if(!file.exists(img.dir)) { dir.create(img.dir) }
+
+    img.filepath <- file.path(img.dir, img.filename)
+
+    postscript(img.filepath, height=7, width=7, onefile=FALSE, horizontal=FALSE)
+        plot( validation.results[,1], validation.results[,4], pch=16, cex=0.5,
+        main=img.title, ylim=y.lim, xlab='Trial #', ylab='Makespan (hr)' )
+
+        lines(validation.results[,1], validation.results[,8], col='red',
+        lty='dotted', lwd=2)
+
+        lines(validation.results[,1], validation.results[,9], col='red',
+        lty='dotted', lwd=2)
+
+        legend('bottomright', legend='95% CI for predicted makespan', 
+        col='red', lty='dotted', lwd=2)
+    dev.off()
+
+    cat('Created plot:', img.filepath, '\n')
+
+} # end function - plot.validation.results
+
+
+
 # ---- 1instance-deterministic-runtimes ----
 
+# Calculate makespan for detemrinistic runtimes
 benefit <- 30 # in dollars
 deadline <- 25 # in hours
 runtimes <- matrix(nrow=5, ncol=3)
@@ -308,593 +548,89 @@ runtimes[,1] = c(5.2, 8.5, 2.5, 4.1, 6) # in hours
 runtimes[,2] = 0.93 * runtimes[,1]
 runtimes[,3] = 0.74 * runtimes[,1]
 
-result = get.schedule.deterministic.runtimes(instance.types, cost, benefit, deadline, runtimes)
+result = get.schedule.deterministic.runtimes(instance.types, cost, benefit,
+  deadline, runtimes)
 
-cat ('Instance type "', result$max.util.instance.type, '" has the maximum utility of $', result$max.util, ' with a makespan of ', result$max.util.makespan, ' hrs\n', sep='')
+cat ('Instance type "', result$max.util.instance.type,
+'" has the maximum utility of $', result$max.util, ' with a makespan of ',
+result$max.util.makespan, ' hrs\n', sep='')
 
 
 
 # ---- 1instance-stochastic-runtimes-known-dist-100tasks ----
-
-num.iter <- 250
-num.tasks <- 100
-num.match <- 0
-num.mismatch <- 0
-optimal <- data.frame()
-
-
-for (j in 1:num.iter) {
-
-  # cat('Processing iteration', j, '\n')
-
-  dist <- c('unif', 'poisson', 'gamma', 'exp')
-  runtimes.dist <- sample(dist, num.tasks, replace=T)
-  validation.data <- create.validation.data(runtimes.dist)
-
-  # a realistic benefit & deadline or no schedule will be found
-  deadline = round(4 * sum(validation.data$actual.runtimes[,1]))
-  benefit = deadline
-
-  result.actual = get.schedule.deterministic.runtimes(instance.types, cost, benefit, deadline, validation.data$actual.runtimes)
-  result.actual
-
-  result.predicted = get.schedule.stochastic.runtimes(instance.types, cost, benefit, deadline, validation.data$means, validation.data$vars, 0.95)
-  result.predicted
-
-  if (result.actual$max.util.instance.type == result.predicted$max.util.instance.type) {
-    num.match <- num.match + 1
-  } else {
-    num.mismatch <- num.mismatch + 1
-  }
-
-  optimal[j, 1] <- result.actual$max.util
-  optimal[j, 2] <- result.actual$max.util.instance.type
-  optimal[j, 3] <- result.actual$max.util.makespan
-
-  optimal[j, 4] <- result.predicted$max.util
-  optimal[j, 5] <- result.predicted$max.util.instance.type
-  optimal[j, 6] <- result.predicted$max.util.makespan.mean
-  optimal[j, 7] <- result.predicted$max.util.makespan.lo
-  optimal[j, 8] <- result.predicted$max.util.makespan.hi
-}
-
-optimal[,2] <- as.factor(optimal[,2])
-optimal[,5] <- as.factor(optimal[,5])
-
-
-optimal <- optimal[order(optimal[,7]),]
-optimal <- cbind(1:NROW(optimal), optimal)
-colnames(optimal) <- c('index', 'actual.util', 'actual.inst', 'actual.makespan',
-'pred.util', 'pred.inst', 'pred.makespan.mean', 'pred.makespan.lo', 'pred.makespan.hi')
-
-y.min <- round(0.9*min(optimal[,c(4,8,9)]))
-y.max <- round(1.1*max(optimal[,c(4,8,9)]))
-
-
-outliers.idx <- optimal[,4] < optimal[,8] | optimal[,4] > optimal[,9]
-outliers <- optimal[outliers.idx,]
-outliers.pct <- round(100*NROW(outliers)/NROW(optimal),2)
-
-imgTitle <- paste('95% CI for makespan via Normal approx.
-(', NROW(optimal), ' trials; ', num.tasks, ' tasks/trial; ',
-outliers.pct, '% outliers)', sep='')
-
-
-plot(optimal[,1], optimal[,4], pch=16, cex=0.6, main=imgTitle,
-  ylim=c(y.min, y.max), xlab='Trial #', ylab='Makespan (hr)')
-lines(optimal[,1], optimal[,8], col='red', lty='dotted', lwd=2)
-lines(optimal[,1], optimal[,9], col='red', lty='dotted', lwd=2)
-
-legend('bottomright', legend='95% CI for predicted makespan', col='red', lty='dotted', lwd=2)
-
+start.time <- proc.time()
+validate.stochastic.runtimes(
+  instance.types=instance.types,
+  instance.costs=instance.costs,
+  num.tasks=100)
+cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-250tasks ----
-
-num.iter <- 250
-num.tasks <- 250
-num.match <- 0
-num.mismatch <- 0
-optimal <- data.frame()
-
-
-for (j in 1:num.iter) {
-
-  # cat('Processing iteration', j, '\n')
-
-  dist <- c('unif', 'poisson', 'gamma', 'exp')
-  runtimes.dist <- sample(dist, num.tasks, replace=T)
-  validation.data <- create.validation.data(runtimes.dist)
-
-  # a realistic benefit & deadline or no schedule will be found
-  deadline = round(4 * sum(validation.data$actual.runtimes[,1]))
-  benefit = deadline
-
-  result.actual = get.schedule.deterministic.runtimes(instance.types, cost, benefit, deadline, validation.data$actual.runtimes)
-  result.actual
-
-  result.predicted = get.schedule.stochastic.runtimes(instance.types, cost, benefit, deadline, validation.data$means, validation.data$vars, 0.95)
-  result.predicted
-
-  if (result.actual$max.util.instance.type == result.predicted$max.util.instance.type) {
-    num.match <- num.match + 1
-  } else {
-    num.mismatch <- num.mismatch + 1
-  }
-
-  optimal[j, 1] <- result.actual$max.util
-  optimal[j, 2] <- result.actual$max.util.instance.type
-  optimal[j, 3] <- result.actual$max.util.makespan
-
-  optimal[j, 4] <- result.predicted$max.util
-  optimal[j, 5] <- result.predicted$max.util.instance.type
-  optimal[j, 6] <- result.predicted$max.util.makespan.mean
-  optimal[j, 7] <- result.predicted$max.util.makespan.lo
-  optimal[j, 8] <- result.predicted$max.util.makespan.hi
-}
-
-optimal[,2] <- as.factor(optimal[,2])
-optimal[,5] <- as.factor(optimal[,5])
-
-
-optimal <- optimal[order(optimal[,7]),]
-optimal <- cbind(1:NROW(optimal), optimal)
-colnames(optimal) <- c('index', 'actual.util', 'actual.inst', 'actual.makespan',
-'pred.util', 'pred.inst', 'pred.makespan.mean', 'pred.makespan.lo', 'pred.makespan.hi')
-
-y.min <- round(0.9*min(optimal[,c(4,8,9)]))
-y.max <- round(1.1*max(optimal[,c(4,8,9)]))
-
-
-outliers.idx <- optimal[,4] < optimal[,8] | optimal[,4] > optimal[,9]
-outliers <- optimal[outliers.idx,]
-outliers.pct <- round(100*NROW(outliers)/NROW(optimal),2)
-
-imgTitle <- paste('95% CI for makespan via Normal approx.
-(', NROW(optimal), ' trials; ', num.tasks, ' tasks/trial; ',
-outliers.pct, '% outliers)', sep='')
-
-
-plot(optimal[,1], optimal[,4], pch=16, cex=0.6, main=imgTitle,
-  ylim=c(y.min, y.max), xlab='Trial #', ylab='Makespan (hr)')
-lines(optimal[,1], optimal[,8], col='red', lty='dotted', lwd=2)
-lines(optimal[,1], optimal[,9], col='red', lty='dotted', lwd=2)
-
-legend('bottomright', legend='95% CI for predicted makespan', col='red', lty='dotted', lwd=2)
-
-
+start.time <- proc.time()
+validate.stochastic.runtimes(
+  instance.types=instance.types,
+  instance.costs=instance.costs,
+  num.tasks=250)
+cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-500tasks ----
-
-num.iter <- 250
-num.tasks <- 500
-num.match <- 0
-num.mismatch <- 0
-optimal <- data.frame()
-
-
-for (j in 1:num.iter) {
-
-  # cat('Processing iteration', j, '\n')
-
-  dist <- c('unif', 'poisson', 'gamma', 'exp')
-  runtimes.dist <- sample(dist, num.tasks, replace=T)
-  validation.data <- create.validation.data(runtimes.dist)
-
-  # a realistic benefit & deadline or no schedule will be found
-  deadline = round(4 * sum(validation.data$actual.runtimes[,1]))
-  benefit = deadline
-
-  result.actual = get.schedule.deterministic.runtimes(instance.types, cost, benefit, deadline, validation.data$actual.runtimes)
-  result.actual
-
-  result.predicted = get.schedule.stochastic.runtimes(instance.types, cost, benefit, deadline, validation.data$means, validation.data$vars, 0.95)
-  result.predicted
-
-  if (result.actual$max.util.instance.type == result.predicted$max.util.instance.type) {
-    num.match <- num.match + 1
-  } else {
-    num.mismatch <- num.mismatch + 1
-  }
-
-  optimal[j, 1] <- result.actual$max.util
-  optimal[j, 2] <- result.actual$max.util.instance.type
-  optimal[j, 3] <- result.actual$max.util.makespan
-
-  optimal[j, 4] <- result.predicted$max.util
-  optimal[j, 5] <- result.predicted$max.util.instance.type
-  optimal[j, 6] <- result.predicted$max.util.makespan.mean
-  optimal[j, 7] <- result.predicted$max.util.makespan.lo
-  optimal[j, 8] <- result.predicted$max.util.makespan.hi
-}
-
-optimal[,2] <- as.factor(optimal[,2])
-optimal[,5] <- as.factor(optimal[,5])
-
-
-optimal <- optimal[order(optimal[,7]),]
-optimal <- cbind(1:NROW(optimal), optimal)
-colnames(optimal) <- c('index', 'actual.util', 'actual.inst', 'actual.makespan',
-'pred.util', 'pred.inst', 'pred.makespan.mean', 'pred.makespan.lo', 'pred.makespan.hi')
-
-y.min <- round(0.9*min(optimal[,c(4,8,9)]))
-y.max <- round(1.1*max(optimal[,c(4,8,9)]))
-
-
-outliers.idx <- optimal[,4] < optimal[,8] | optimal[,4] > optimal[,9]
-outliers <- optimal[outliers.idx,]
-outliers.pct <- round(100*NROW(outliers)/NROW(optimal),2)
-
-imgTitle <- paste('95% CI for makespan via Normal approx.
-(', NROW(optimal), ' trials; ', num.tasks, ' tasks/trial; ',
-outliers.pct, '% outliers)', sep='')
-
-
-plot(optimal[,1], optimal[,4], pch=16, cex=0.6, main=imgTitle,
-  ylim=c(y.min, y.max), xlab='Trial #', ylab='Makespan (hr)')
-lines(optimal[,1], optimal[,8], col='red', lty='dotted', lwd=2)
-lines(optimal[,1], optimal[,9], col='red', lty='dotted', lwd=2)
-
-legend('bottomright', legend='95% CI for predicted makespan', col='red', lty='dotted', lwd=2)
-
-
+start.time <- proc.time()
+validate.stochastic.runtimes(
+  instance.types=instance.types,
+  instance.costs=instance.costs,
+  num.tasks=500)
+ cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-1000tasks ----
-
-num.iter <- 250
-num.tasks <- 1000
-num.match <- 0
-num.mismatch <- 0
-optimal <- data.frame()
-
-
-for (j in 1:num.iter) {
-
-  # cat('Processing iteration', j, '\n')
-
-  dist <- c('unif', 'poisson', 'gamma', 'exp')
-  runtimes.dist <- sample(dist, num.tasks, replace=T)
-  validation.data <- create.validation.data(runtimes.dist)
-
-  # a realistic benefit & deadline or no schedule will be found
-  deadline = round(4 * sum(validation.data$actual.runtimes[,1]))
-  benefit = deadline
-
-  result.actual = get.schedule.deterministic.runtimes(instance.types, cost, benefit, deadline, validation.data$actual.runtimes)
-  result.actual
-
-  result.predicted = get.schedule.stochastic.runtimes(instance.types, cost, benefit, deadline, validation.data$means, validation.data$vars, 0.95)
-  result.predicted
-
-  if (result.actual$max.util.instance.type == result.predicted$max.util.instance.type) {
-    num.match <- num.match + 1
-  } else {
-    num.mismatch <- num.mismatch + 1
-  }
-
-  optimal[j, 1] <- result.actual$max.util
-  optimal[j, 2] <- result.actual$max.util.instance.type
-  optimal[j, 3] <- result.actual$max.util.makespan
-
-  optimal[j, 4] <- result.predicted$max.util
-  optimal[j, 5] <- result.predicted$max.util.instance.type
-  optimal[j, 6] <- result.predicted$max.util.makespan.mean
-  optimal[j, 7] <- result.predicted$max.util.makespan.lo
-  optimal[j, 8] <- result.predicted$max.util.makespan.hi
-}
-
-optimal[,2] <- as.factor(optimal[,2])
-optimal[,5] <- as.factor(optimal[,5])
-
-
-optimal <- optimal[order(optimal[,7]),]
-optimal <- cbind(1:NROW(optimal), optimal)
-colnames(optimal) <- c('index', 'actual.util', 'actual.inst', 'actual.makespan',
-'pred.util', 'pred.inst', 'pred.makespan.mean', 'pred.makespan.lo', 'pred.makespan.hi')
-
-y.min <- round(0.9*min(optimal[,c(4,8,9)]))
-y.max <- round(1.1*max(optimal[,c(4,8,9)]))
-
-
-outliers.idx <- optimal[,4] < optimal[,8] | optimal[,4] > optimal[,9]
-outliers <- optimal[outliers.idx,]
-outliers.pct <- round(100*NROW(outliers)/NROW(optimal),2)
-
-imgTitle <- paste('95% CI for makespan via Normal approx.
-(', NROW(optimal), ' trials; ', num.tasks, ' tasks/trial; ',
-outliers.pct, '% outliers)', sep='')
-
-
-plot(optimal[,1], optimal[,4], pch=16, cex=0.6, main=imgTitle,
-  ylim=c(y.min, y.max), xlab='Trial #', ylab='Makespan (hr)')
-lines(optimal[,1], optimal[,8], col='red', lty='dotted', lwd=2)
-lines(optimal[,1], optimal[,9], col='red', lty='dotted', lwd=2)
-
-legend('bottomright', legend='95% CI for predicted makespan', col='red', lty='dotted', lwd=2)
-
+start.time <- proc.time()
+validate.stochastic.runtimes(
+  instance.types=instance.types,
+  instance.costs=instance.costs,
+  num.tasks=1000)
+cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
+  
 
 # ---- 1instance-stochastic-runtimes-known-dist-10tasks ----
+start.time <- proc.time()
+validate.stochastic.runtimes.bootstrap(
+  instance.types, instance.costs,
+  num.tasks=10)
+cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
-num.iter <- 250
-num.tasks <- 10
-num.match <- 0
-num.mismatch <- 0
-optimal <- data.frame()
-
-for (j in 1:num.iter) {
-
-  # cat('Processing iteration', j, '\n')
-
-  dist <- c('unif', 'poisson', 'gamma', 'exp')
-  runtimes.dist <- sample(dist, num.tasks, replace=T)
-  validation.data <- create.validation.data(runtimes.dist)
-
-  # a realistic benefit & deadline or no schedule will be found
-  deadline = round(5 * sum(validation.data$actual.runtimes[,1]))
-  benefit = deadline
-
-  result.actual = get.schedule.deterministic.runtimes(instance.types, cost, benefit, deadline, validation.data$actual.runtimes)
-
-  result.predicted = get.schedule.stochastic.runtimes.bootstrap(instance.types, cost, benefit, deadline, validation.data$dist.params, 1000, 0.95)
-
-  if (result.actual$max.util.instance.type == result.predicted$max.util.instance.type) {
-    num.match <- num.match + 1
-  } else {
-    num.mismatch <- num.mismatch + 1
-  }
-
-  optimal[j, 1] <- result.actual$max.util
-  optimal[j, 2] <- result.actual$max.util.instance.type
-  optimal[j, 3] <- result.actual$max.util.makespan
-
-  optimal[j, 4] <- result.predicted$max.util
-  optimal[j, 5] <- result.predicted$max.util.instance.type
-  optimal[j, 6] <- result.predicted$max.util.makespan.mean
-  optimal[j, 7] <- result.predicted$max.util.makespan.lo
-  optimal[j, 8] <- result.predicted$max.util.makespan.hi
-}
-
-
-optimal[,2] <- as.factor(optimal[,2])
-optimal[,5] <- as.factor(optimal[,5])
-
-optimal <- optimal[order(optimal[,7]),]
-optimal <- cbind(1:NROW(optimal), optimal)
-colnames(optimal) <- c('index', 'actual.util', 'actual.inst', 'actual.makespan',
-'pred.util', 'pred.inst', 'pred.makespan.mean', 'pred.makespan.lo', 'pred.makespan.hi')
-
-y.min <- round(0.9*min(optimal[,c(4,8,9)]))
-y.max <- round(1.1*max(optimal[,c(4,8,9)]))
-
-outliers.idx <- optimal[,4] < optimal[,8] | optimal[,4] > optimal[,9]
-outliers <- optimal[outliers.idx,]
-outliers.pct <- round(100*NROW(outliers)/NROW(optimal),2)
-
-imgTitle <- paste('95% CI for makespan via bootstrap approx.
-(', NROW(optimal), ' trials; ', num.tasks, ' tasks/trial; ',
-outliers.pct, '% outliers)', sep='')
-
-
-plot(optimal[,1], optimal[,4], pch=16, cex=0.6, main=imgTitle,
-  ylim=c(y.min, y.max), xlab='Trial #', ylab='Makespan (hr)')
-lines(optimal[,1], optimal[,8], col='red', lty='dotted', lwd=2)
-lines(optimal[,1], optimal[,9], col='red', lty='dotted', lwd=2)
-
-legend('bottomright', legend='95% CI for predicted makespan', col='red', lty='dotted', lwd=2)
-
-
+# ---- 1instance-stochastic-runtimes-known-dist-20tasks ----
+start.time <- proc.time()
+validate.stochastic.runtimes.bootstrap(
+  instance.types=instance.types, instance.costs=instance.costs,
+  num.tasks=20)
+cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-25tasks ----
-
-num.iter <- 250
-num.tasks <- 25
-num.match <- 0
-num.mismatch <- 0
-optimal <- data.frame()
-
-for (j in 1:num.iter) {
-
-  # cat('Processing iteration', j, '\n')
-
-  dist <- c('unif', 'poisson', 'gamma', 'exp')
-  runtimes.dist <- sample(dist, num.tasks, replace=T)
-  validation.data <- create.validation.data(runtimes.dist)
-
-  # a realistic benefit & deadline or no schedule will be found
-  deadline = round(5 * sum(validation.data$actual.runtimes[,1]))
-  benefit = deadline
-
-  result.actual = get.schedule.deterministic.runtimes(instance.types, cost, benefit, deadline, validation.data$actual.runtimes)
-
-  result.predicted = get.schedule.stochastic.runtimes.bootstrap(instance.types, cost, benefit, deadline, validation.data$dist.params, 1000, 0.95)
-
-  if (result.actual$max.util.instance.type == result.predicted$max.util.instance.type) {
-    num.match <- num.match + 1
-  } else {
-    num.mismatch <- num.mismatch + 1
-  }
-
-  optimal[j, 1] <- result.actual$max.util
-  optimal[j, 2] <- result.actual$max.util.instance.type
-  optimal[j, 3] <- result.actual$max.util.makespan
-
-  optimal[j, 4] <- result.predicted$max.util
-  optimal[j, 5] <- result.predicted$max.util.instance.type
-  optimal[j, 6] <- result.predicted$max.util.makespan.mean
-  optimal[j, 7] <- result.predicted$max.util.makespan.lo
-  optimal[j, 8] <- result.predicted$max.util.makespan.hi
-}
-
-
-optimal[,2] <- as.factor(optimal[,2])
-optimal[,5] <- as.factor(optimal[,5])
-
-optimal <- optimal[order(optimal[,7]),]
-optimal <- cbind(1:NROW(optimal), optimal)
-colnames(optimal) <- c('index', 'actual.util', 'actual.inst', 'actual.makespan',
-'pred.util', 'pred.inst', 'pred.makespan.mean', 'pred.makespan.lo', 'pred.makespan.hi')
-
-y.min <- round(0.9*min(optimal[,c(4,8,9)]))
-y.max <- round(1.1*max(optimal[,c(4,8,9)]))
-
-outliers.idx <- optimal[,4] < optimal[,8] | optimal[,4] > optimal[,9]
-outliers <- optimal[outliers.idx,]
-outliers.pct <- round(100*NROW(outliers)/NROW(optimal),2)
-
-imgTitle <- paste('95% CI for makespan via bootstrap approx.
-(', NROW(optimal), ' trials; ', num.tasks, ' tasks/trial; ',
-outliers.pct, '% outliers)', sep='')
-
-
-plot(optimal[,1], optimal[,4], pch=16, cex=0.6, main=imgTitle,
-  ylim=c(y.min, y.max), xlab='Trial #', ylab='Makespan (hr)')
-lines(optimal[,1], optimal[,8], col='red', lty='dotted', lwd=2)
-lines(optimal[,1], optimal[,9], col='red', lty='dotted', lwd=2)
-
-legend('bottomright', legend='95% CI for predicted makespan', col='red', lty='dotted', lwd=2)
-
-
+start.time <- proc.time()
+validate.stochastic.runtimes.bootstrap(
+  instance.types=instance.types, instance.costs=instance.costs,
+  num.tasks=25)
+cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-50tasks ----
-
-num.iter <- 250
-num.tasks <- 50
-num.match <- 0
-num.mismatch <- 0
-optimal <- data.frame()
-
-for (j in 1:num.iter) {
-
-  # cat('Processing iteration', j, '\n')
-
-  dist <- c('unif', 'poisson', 'gamma', 'exp')
-  runtimes.dist <- sample(dist, num.tasks, replace=T)
-  validation.data <- create.validation.data(runtimes.dist)
-
-  # a realistic benefit & deadline or no schedule will be found
-  deadline = round(5 * sum(validation.data$actual.runtimes[,1]))
-  benefit = deadline
-
-  result.actual = get.schedule.deterministic.runtimes(instance.types, cost, benefit, deadline, validation.data$actual.runtimes)
-
-  result.predicted = get.schedule.stochastic.runtimes.bootstrap(instance.types, cost, benefit, deadline, validation.data$dist.params, 1000, 0.95)
-
-  if (result.actual$max.util.instance.type == result.predicted$max.util.instance.type) {
-    num.match <- num.match + 1
-  } else {
-    num.mismatch <- num.mismatch + 1
-  }
-
-  optimal[j, 1] <- result.actual$max.util
-  optimal[j, 2] <- result.actual$max.util.instance.type
-  optimal[j, 3] <- result.actual$max.util.makespan
-
-  optimal[j, 4] <- result.predicted$max.util
-  optimal[j, 5] <- result.predicted$max.util.instance.type
-  optimal[j, 6] <- result.predicted$max.util.makespan.mean
-  optimal[j, 7] <- result.predicted$max.util.makespan.lo
-  optimal[j, 8] <- result.predicted$max.util.makespan.hi
-}
-
-
-optimal[,2] <- as.factor(optimal[,2])
-optimal[,5] <- as.factor(optimal[,5])
-
-optimal <- optimal[order(optimal[,7]),]
-optimal <- cbind(1:NROW(optimal), optimal)
-colnames(optimal) <- c('index', 'actual.util', 'actual.inst', 'actual.makespan',
-'pred.util', 'pred.inst', 'pred.makespan.mean', 'pred.makespan.lo', 'pred.makespan.hi')
-
-y.min <- round(0.9*min(optimal[,c(4,8,9)]))
-y.max <- round(1.1*max(optimal[,c(4,8,9)]))
-
-outliers.idx <- optimal[,4] < optimal[,8] | optimal[,4] > optimal[,9]
-outliers <- optimal[outliers.idx,]
-outliers.pct <- round(100*NROW(outliers)/NROW(optimal),2)
-
-imgTitle <- paste('95% CI for makespan via bootstrap approx.
-(', NROW(optimal), ' trials; ', num.tasks, ' tasks/trial; ',
-outliers.pct, '% outliers)', sep='')
-
-
-plot(optimal[,1], optimal[,4], pch=16, cex=0.6, main=imgTitle,
-  ylim=c(y.min, y.max), xlab='Trial #', ylab='Makespan (hr)')
-lines(optimal[,1], optimal[,8], col='red', lty='dotted', lwd=2)
-lines(optimal[,1], optimal[,9], col='red', lty='dotted', lwd=2)
-
-legend('bottomright', legend='95% CI for predicted makespan', col='red', lty='dotted', lwd=2)
-
-
+start.time <- proc.time()
+validate.stochastic.runtimes.bootstrap(
+  instance.types=instance.types, instance.costs=instance.costs,
+  num.tasks=50)
+cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-75tasks ----
+start.time <- proc.time()
+validate.stochastic.runtimes.bootstrap(
+  instance.types=instance.types, instance.costs=instance.costs,
+  num.tasks=75)
+cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
-num.iter <- 250
-num.tasks <- 75
-num.match <- 0
-num.mismatch <- 0
-optimal <- data.frame()
-
-for (j in 1:num.iter) {
-
-  # cat('Processing iteration', j, '\n')
-
-  dist <- c('unif', 'poisson', 'gamma', 'exp')
-  runtimes.dist <- sample(dist, num.tasks, replace=T)
-  validation.data <- create.validation.data(runtimes.dist)
-
-  # a realistic benefit & deadline or no schedule will be found
-  deadline = round(5 * sum(validation.data$actual.runtimes[,1]))
-  benefit = deadline
-
-  result.actual = get.schedule.deterministic.runtimes(instance.types, cost, benefit, deadline, validation.data$actual.runtimes)
-
-  result.predicted = get.schedule.stochastic.runtimes.bootstrap(instance.types, cost, benefit, deadline, validation.data$dist.params, 1000, 0.95)
-
-  if (result.actual$max.util.instance.type == result.predicted$max.util.instance.type) {
-    num.match <- num.match + 1
-  } else {
-    num.mismatch <- num.mismatch + 1
-  }
-
-  optimal[j, 1] <- result.actual$max.util
-  optimal[j, 2] <- result.actual$max.util.instance.type
-  optimal[j, 3] <- result.actual$max.util.makespan
-
-  optimal[j, 4] <- result.predicted$max.util
-  optimal[j, 5] <- result.predicted$max.util.instance.type
-  optimal[j, 6] <- result.predicted$max.util.makespan.mean
-  optimal[j, 7] <- result.predicted$max.util.makespan.lo
-  optimal[j, 8] <- result.predicted$max.util.makespan.hi
-}
-
-
-optimal[,2] <- as.factor(optimal[,2])
-optimal[,5] <- as.factor(optimal[,5])
-
-optimal <- optimal[order(optimal[,7]),]
-optimal <- cbind(1:NROW(optimal), optimal)
-colnames(optimal) <- c('index', 'actual.util', 'actual.inst', 'actual.makespan',
-'pred.util', 'pred.inst', 'pred.makespan.mean', 'pred.makespan.lo', 'pred.makespan.hi')
-
-y.min <- round(0.9*min(optimal[,c(4,8,9)]))
-y.max <- round(1.1*max(optimal[,c(4,8,9)]))
-
-outliers.idx <- optimal[,4] < optimal[,8] | optimal[,4] > optimal[,9]
-outliers <- optimal[outliers.idx,]
-outliers.pct <- round(100*NROW(outliers)/NROW(optimal),2)
-
-imgTitle <- paste('95% CI for makespan via bootstrap approx.
-(', NROW(optimal), ' trials; ', num.tasks, ' tasks/trial; ',
-outliers.pct, '% outliers)', sep='')
-
-
-plot(optimal[,1], optimal[,4], pch=16, cex=0.6, main=imgTitle,
-  ylim=c(y.min, y.max), xlab='Trial #', ylab='Makespan (hr)')
-lines(optimal[,1], optimal[,8], col='red', lty='dotted', lwd=2)
-lines(optimal[,1], optimal[,9], col='red', lty='dotted', lwd=2)
-
-legend('bottomright', legend='95% CI for predicted makespan', col='red', lty='dotted', lwd=2)
-
-
+# ---- 1instance-stochastic-runtimes-known-dist-100tasks ----
+start.time <- proc.time()
+validate.stochastic.runtimes.bootstrap(
+  instance.types=instance.types, instance.costs=instance.costs,
+  num.tasks=100)
+cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 
 # ---- sched-1task-1inst ----
@@ -910,9 +646,9 @@ best.schedule <- schedule(job, deadline, cluster.instance.type, cluster.size,
 max.iter, max.temp, reset.score.pct, debug=TRUE)
 scores.ts <- attr(best.schedule, 'scores.ts')
 
-imgTitle <- 'Probability of completing job by deadline'
+img.title <- 'Probability of completing job by deadline'
 plot(scores.ts[,1], scores.ts[,2], type='l', ylim=c(0,1), xlab='Iteration',
-ylab='Score', main=imgTitle)
+ylab='Score', main=img.title)
 lines(scores.ts[,1], scores.ts[,5], type='l', col='#e41a1c')
 grid()
 
@@ -923,35 +659,106 @@ deadline <- 300
 cluster.instance.type <- 'm3xlarge'
 cluster.size <- 2
 max.iter <- 10
-max.temp <- 0.5
+max.temp <- 100
 reset.score.pct <- 10
 
 best.schedule <- schedule(job, deadline, cluster.instance.type, cluster.size,
 max.iter, max.temp, reset.score.pct, debug=TRUE)
 scores.ts <- attr(best.schedule, 'scores.ts')
 
-imgTitle <- 'Probability of completing job by deadline'
+img.title <- 'Probability of completing job by deadline'
 plot(scores.ts[,1], scores.ts[,2], type='l', ylim=c(0,1), xlab='Iteration',
-ylab='Score', main=imgTitle)
+ylab='Score', main=img.title)
 lines(scores.ts[,1], scores.ts[,5], type='l', col='#e41a1c')
 grid()
 
 
 # ---- sched-113task-4inst ----
 job <- c(1,2,2,2,3,3,4,4,5,10,10,10,15,15,15,25,25,25,25,25,30,35,35,35,40,40,45,50,50,50,55,65,70,75,75,80,85,85,95,95,95,100,110,115,125,130,135,150,155,155,155,155,155,165,170,170,175,180,185,185,190,190,195,220,220,230,230,250,250,275,300,300,300,300,325,325,350,350,375,400,450,450,500,550,550,650,650,800,900,900,900,950,1000,1300,1300,1300,1500,1600,1700,1700,1700,1800,1900,1900,1900,2000,2200,2300,2500,2600,2700,2800,2900)
-deadline <- 5000
+deadline <- 3000
 cluster.instance.type <- 'm3xlarge'
 cluster.size <- 4
 max.iter <- 100
-max.temp <- 0.5
+max.temp <- 10
 reset.score.pct <- 10
 
 best.schedule <- schedule(job, deadline, cluster.instance.type, cluster.size,
 max.iter, max.temp, reset.score.pct, debug=TRUE)
-scores.ts <- attr(best.schedule, 'scores.ts')
 
-imgTitle <- 'Score of accepted assignments in 100 SA iterations \n (113 tasks on 4 processors)'
-plot(scores.ts[,1], scores.ts[,2], type='l', lwd=2, ylim=c(0,1), xlab='Iteration',
-ylab='Score', main=imgTitle)
-lines(scores.ts[,1], scores.ts[,5], type='l', lwd=2, col='#e41a1c')
-grid()
+leptf.schedule <- get.initial.schedule(cluster.size, job, rts, 'leptf')
+leptf.schedule <- get.score(leptf.schedule, rt, rts, deadline)
+
+plot(attr(best.schedule, 'score'), attr(leptf.schedule, 'score'),
+main='Probability of completing tasks by deadline', xlab='Predicted',
+ylab='LEPT')
+
+plot(attr(best.schedule, 'processing.cost'),
+attr(leptf.schedule, 'processing.cost'),
+main='Cost of processing tasks by deadline ($)', xlab='Predicted', ylab='LEPT')
+
+
+
+# ---- SA.validation ----
+task.file <- 'validate/10-tasks.jobs.tab'
+tasks <- read.table(task.file, header=T, row.names=1, stringsAsFactors=FALSE)
+task.sizes <- tasks[,2]
+
+scores <- matrix(nrow=NROW(tasks), ncol=2)
+costs <- matrix(nrow=NROW(tasks), ncol=2)
+
+# for (trial in 1:length(task.sizes)) {
+for (i in 1:NROW(tasks)) {
+
+  cat('Processing trial', i, '\n')
+
+  job <- as.numeric(strsplit(task.sizes[i], ',')[[1]])
+  deadline <- 750
+  cluster.instance.type <- 'm3xlarge'
+  cluster.size <- 2
+  max.iter <- 100
+  max.temp <- 10
+  reset.score.pct <- 10
+
+  best.schedule <- schedule(job, deadline, cluster.instance.type, cluster.size,
+  max.iter, max.temp, reset.score.pct, debug=TRUE)
+
+  leptf.schedule <- get.initial.schedule(cluster.size, job, rts, 'leptf')
+  leptf.schedule <- get.score(leptf.schedule, rt, rts, deadline)
+
+  scores[i,1] <- attr(best.schedule, 'score')
+  scores[i,2] <- attr(leptf.schedule, 'score')
+
+  costs[i,1] <- attr(best.schedule, 'processing.cost')
+  costs[i,2] <- attr(leptf.schedule, 'processing.cost')
+
+}
+
+colnames(costs) <- c('Predicted', 'LEPT')
+colnames(scores) <- c('Predicted', 'LEPT')
+
+plot(scores, main='Probability of completing tasks by deadline',
+xlab='Simulated Annealing Prediction', ylab='LEPT',
+xlim=range(scores), ylim=range(scores))
+abline(0,1)
+
+
+img.filename <- 'validate-SA-LEPT-scores-2inst-100iter-10tasks.eps'
+postscript(img.filename, height=7, width=7, onefile=FALSE, horizontal=FALSE)
+  par(mar=par()$mar + 2)
+  plot(scores, main='Probability of completing tasks by deadline',
+  xlab='Simulated Annealing Prediction', ylab='LEPT', xlim=range(scores),
+  ylim=range(scores), cex=0.75)
+  abline(0,1)
+  abline(v=0.95, lty='dotted')
+  abline(h=0.95, lty='dotted')
+dev.off()
+
+
+img.filename <- 'validate-SA-LEPT-costs-2inst-100iter-10tasks.eps'
+postscript(img.filename, height=7, width=7, onefile=FALSE, horizontal=FALSE)
+  par(mar=par()$mar + 2)
+  plot(costs, main='Cost of completing tasks by deadline ($)',
+  xlab='Simulated Annealing Prediction', ylab='LEPT', xlim=range(costs),
+  ylim=range(costs), cex=0.75)
+  abline(0,1)
+dev.off()
