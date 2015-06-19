@@ -87,11 +87,11 @@ Requires: caTools, htmltools, knitr, yaml
 Package: schedulr
 Source: github
 Version: 0.0.0.9000
-Hash: a071a51c56557cd53a8245dfb71218e6b7f4f5f2
+Hash: deb24e7521cc6812122cea89114cef4991df933f
 GithubRepo: schedulr
 GithubUsername: niranjv
 GithubRef: develop
-GithubSha1: a071a51c56557cd53a8245dfb71218e6b7f4f5f2
+GithubSha1: deb24e7521cc6812122cea89114cef4991df933f
 
 Package: stringr
 Source: CRAN
