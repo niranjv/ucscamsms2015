@@ -69,6 +69,7 @@ source_clean <- function(path) {
 
 # ----------==========----------
 
+
 date()
 start.time <- proc.time()
 
@@ -83,8 +84,7 @@ lapply(chapters, render_chapter)
 # report.tex is the parent tex file that includes the tex files generated above
 file.copy('content/report.tex', 'tex/')
 file.remove(dir('tex/figures', full.names=TRUE))
-unlink(dir('tex/figures'), force=TRUE)
-file.rename('content/figures/', 'tex/figures')
+file.copy('content/figures/', 'tex/figures')
 
 
 # xelatex converts report.tex -> report.pdf
