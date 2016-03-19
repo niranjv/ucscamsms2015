@@ -86,7 +86,7 @@ of the requirements for the degree of \\
 \textbf{Niranjan Vissa} \\
 \vspace*{0.15in}
 
-August 2015
+March 2016
 \large
 \vspace*{0.15in}
 
@@ -125,7 +125,7 @@ Professor Herbert Lee
 \begin{center} \textbf{\large ACKNOWLEDGEMENTS} \end{center}
 \bigskip
 \noindent
-To be completed
+I would like to acknowledge the guidance, wisdom and patience of Prof. David Draper without whom this project could not have been completed. I would also like to thank Prof. Herbert Lee for taking the time to read initial versions of this report and provide many valuable comments.
 
 \newpage
 
@@ -181,7 +181,7 @@ Thus, there is always a trade-off between the benefit arising from processing a 
 
 In most cases, the benefit is a fixed value and is paid out when all tasks in the workload are completed by a given deadline.
 It does not increase if the tasks are completed earlier and will not be paid out if tasks are not completed by the deadline.
-The only way for the client to maximize the benefit is to complete all tasks by the deadline with the lowest possible processing costs.
+The only way for a client to maximize its profit is to complete all tasks by the deadline with the lowest possible processing costs.
 The rest of this report deals with developing efficient methods of scheduling tasks in parallel on multiple resources to achieve this goal.
 
 
@@ -238,7 +238,7 @@ In this report, I focus on the problem of finding optimal non-pre-emptive schedu
 \nomenclature{$M_S$}{Makespan of schedule $S$ to process the set of tasks $\mathcal{T}$}
 \nomenclature{$C_j$}{Cost per hour of instance $I_j$ (specified in dollars/hour)}
 \nomenclature{$Y_j$}{Type of instance $I_j$. Each type represents a certain configuration of CPU, memory, disk space and network speed.}
-\nomenclature{$S$}{A schedule that maps tasks to resources that can process the tasks}
+\nomenclature{$S$}{A schedule that maps tasks to instances that can process the tasks}
 \nomenclature{$U_{km}$}{Utility of a schedule using $m$ instances of type $k$}
 
 \section{Problem Formulation}
@@ -332,7 +332,7 @@ An implicit assumption in (\ref{eq:def:utility:deterministic:simplified}) is tha
 But this is not always the case.
 It is not uncommon to find situations where the runtime of a task is known only when the task completes processing.
 In some cases, the runtimes are distributed according to a probability distribution that is known in advance.
-Each runtime can be distributed according to a different probability distribution.
+Each runtime can be distributed according to a different known probability distribution.
 In other cases, even the form of the probability distribution is not known or has no closed form expression.
 In such cases, the distribution of task runtimes must be determined empirically as described in the next section.
 
@@ -343,7 +343,7 @@ When runtimes are stochastic, (\ref{eq:def:utility:deterministic:simplified}) be
 	E(U_{km}) = - \bigg[\sum_{j=1}^{m} \sum_{k \in t_{I_j}} E(r_{kj}) \bigg] \cdot C_k
 \end{equation}
 
-where $t_{I_j}$ is the index of the tasks in $\mathcal{T}$ assigned to instance $I_j$ by $S$, $E(U_{km})$ is the expected utility of a schedule using $m$ instances of type $k$ and I maximize \textit{expected} utility by averaging over all possible runtimes.
+where $t_{I_j}$ is the index of the tasks in $\mathcal{T}$ assigned to instance $I_j$ by $S$. $E(U_{km})$ is the expected utility of a schedule using $m$ instances of type $k$ and I maximize \textit{expected} utility by averaging over all possible runtimes.
 
 Schedules for tasks with stochastic runtimes have stochastic makespans that have their own probability distribution. 
 In this case, I relax my definition of feasibility so that any schedule with a makespan whose $95\textsuperscript{th}$ percentile is $\le D$ is considered feasible. 
@@ -368,16 +368,15 @@ There are dozens of such instance types and thousands of instances of the same t
 Instance types and the number of instances of a certain type represent the action space of the decision problem.
 In this report, I assume that tasks are constrained only by processor speed and not by any other properties of an instance.
 
-\item \textbf{Instance costs}: Each instance type is associated with an hourly cost. Determined by Amazon and specified in dollars. 
+\item \textbf{Instance costs}: Each instance type is associated with an hourly cost that is determined by Amazon and specified in dollars. 
 
 \item \textbf{Task lengths}:
 The input to the problem is a set of tasks.
 Each task is associated with a property called \textit{length}.
-Runtime for a task is roughly proportional to its length.
+Runtime for a task on a given instance type is roughly proportional to its length.
 Besides length, other properties of the task also influence task runtime.
 If these properties were easy to quantify, then runtime would be a deterministic function of length and the other properties.
-But these properties are not easily quantifiable, so task runtime is considered to be a random unknown with length as the only co-variate that can be used to predict runtime.
-Note that task runtime depends on task length and the instance type on which the task is running.
+But these properties are not easily quantifiable, so task runtime is considered to be a random unknown with length as the only co-variate that can be used to predict runtime on the given instance type.
 
 \end{itemize}
 
@@ -412,13 +411,12 @@ A value is randomly sampled from the runtime distribution of each of the input t
 These values are then summed to give a value for makespan.
 This process is repeated a large number of times, resulting in a bootstrap distribution for makespan.
 
-In all the above cases, the $95\textsuperscript{th}$ percentile of the makespan distribution is assumed to represent the makespan of the input set of tasks on the instance type under consideration.
-This value is used to calculate (expected) utility and determine the instance type that maximizes (expected) utility.
-
-
 If the runtime distribution for one or more tasks is unknown or does not have a closed form expression, a value must be sampled from the empirical distribution for the runtime.
 The empirical runtime distribution for a task with length $l$ on an instance of type $k$ is determined by processing a number of samples of tasks with length $l$ on an instance of type $k$ and recording the runtimes.
 This set of runtimes represents the empirical probability distribution for the runtime and can be sampled to get a value for the runtime of the associated task.
+
+In all the above cases with stochastic runtimes, the $95\textsuperscript{th}$ percentile of the makespan distribution is assumed to represent the makespan of the input set of tasks on the instance type under consideration.
+This value is used to calculate expected utility and determine the instance type that maximizes expected utility.
 
 \section{Validation}
 
@@ -450,7 +448,7 @@ C                                                            & 1.35  & 1.3      
 When 100 or more input tasks with stochastic runtimes are submitted, the makespan has a Normal distribution by the Central Limit Theorem (CLT).
 (100 is an arbitrary threshold chosen to satisfy the 'sufficiently large number of values' assumption of the CLT).
 To validate the above method, tasks are chosen whose actual runtimes are known.
-These runtimes represent the 'truth' and are used to calculate the true optimal schedule as shown in Section \ref{validate:runtimes:deterministic}. 
+These runtimes represent the 'truth' and are used to calculate the true optimal schedule using the method for deterministic runtimes. 
 This true optimal schedule is then compared to the predicted optimal schedule to determine the effectiveness of the above method. 
 
 Each schedule is associated with an instance type, makespan and processing cost. 
@@ -469,12 +467,13 @@ I decided to validate collections of tasks containing 100, 250, 500 and 1000 tas
 1000 collections of tasks were generated for each of the above sizes (e.g., 1000 sets of 100 tasks each).
 For each task in each collection, runtime was sampled from one of four distributions with positive support (Poisson, Exponential, Gamma and Uniform).
 The parameters for these distributions were arbitrary and could be different for different tasks.
-For each task, the distribution and parameters used were recorded.
+For each task, the distribution and parameters used were recorded, in addition to the sampled value.
 So 100 tasks in a collection, for instance, could contain runtimes from all 4 distributions in different quantities.
 The true optimal schedule (instance type and makespan) was calculated for each collection of tasks using the sampled values assuming an action space of the 3 simulated instance types (A, B and C) mentioned in the previous section.
-Distribution information for each task was used to predict the makespan distribution and the optimal schedule.
+The parameters of the Normal distribution for the makespan associated with each instance type were determined from the parameters of the individual distributions of runtimes.
+The optimal schedule was the one that completed all tasks with the lowest cost and with a makespan that was within 5\% of the deadline.
 
-Figure \ref{fig:validate-stochastic-runtimes-1000-trials-100-tasks} shows the results of these predictions when processing 100 tasks at a time.
+Figure \ref{fig:validate-stochastic-runtimes-1000-trials-100-tasks} shows the results of these predictions when processing 100 tasks at a time on a single instance of a given instance type.
 Each black point represents the true makespan for a set of 100 tasks.
 There are 1000 such points in the plot.
 The red dots represent the 95\% confidence interval for predicted makespan based on a Normal approximation to the makespan distribution.
@@ -508,30 +507,30 @@ Results in this case are very similar and are not shown.
 \subsection{$< 100$ tasks/instance}
 
 When an instance is assigned less than 100 tasks/instance, the Central Limit Theorem does not apply and the makespan distribution must be determined through other means.
-I use bootstrap re-sampling to construct a distribution for makespan.
+I use bootstrap re-sampling to construct a distribution for the makespan.
 Simulated collections of tasks are generated in the same manner as in the previous section and the predicted optimal schedules are compared to the true optimal schedules.
 
 \begin{figure}
 \includegraphics[width=1\textwidth]{validate-stochastic-runtimes-1000-trials-10-tasks.eps}
-\caption{\textit{95\% confidence interval for makespan using Normal approximation when 10 tasks are processed on a single instance. Data sorted by lower bound of 95\% CI.}}
+\caption{\textit{95\% confidence interval for makespan using Bootstrap approximation when 10 tasks are processed on a single instance. Data sorted by lower bound of 95\% CI.}}
 \label{fig:validate-stochastic-runtimes-1000-trials-10-tasks}
 \end{figure}
 
 \begin{figure}
 \includegraphics[width=1\textwidth]{validate-stochastic-runtimes-1000-trials-25-tasks.eps}
-\caption{\textit{95\% confidence interval for makespan using Normal approximation when 25 tasks are processed on a single instance. Data sorted by lower bound of 95\% CI.}}
+\caption{\textit{95\% confidence interval for makespan using Bootstrap approximation when 25 tasks are processed on a single instance. Data sorted by lower bound of 95\% CI.}}
 \label{fig:validate-stochastic-runtimes-1000-trials-25-tasks}
 \end{figure}
 
 \begin{figure}
 \includegraphics[width=1\textwidth]{validate-stochastic-runtimes-1000-trials-50-tasks.eps}
-\caption{\textit{95\% confidence interval for makespan using Normal approximation when 50 tasks are processed on a single instance. Data sorted by lower bound of 95\% CI.}}
+\caption{\textit{95\% confidence interval for makespan using Bootstrap approximation when 50 tasks are processed on a single instance. Data sorted by lower bound of 95\% CI.}}
 \label{fig:validate-stochastic-runtimes-1000-trials-50-tasks}
 \end{figure}
 
 \begin{figure}
 \includegraphics[width=1\textwidth]{validate-stochastic-runtimes-1000-trials-75-tasks.eps}
-\caption{\textit{95\% confidence interval for makespan using Normal approximation when 75 tasks are processed on a single instance. Data sorted by lower bound of 95\% CI.}}ha
+\caption{\textit{95\% confidence interval for makespan using Bootstrap approximation when 75 tasks are processed on a single instance. Data sorted by lower bound of 95\% CI.}}ha
 \label{fig:validate-stochastic-runtimes-1000-trials-75-tasks}
 \end{figure}
 
@@ -540,7 +539,7 @@ In this case, the predictions are not very good - only 77\% of the predictions u
 Of this 77\%, the 95\% confidence interval contains all but 2.08\% of the true values of the makespan.
 Figures \ref{fig:validate-stochastic-runtimes-1000-trials-25-tasks}, \ref{fig:validate-stochastic-runtimes-1000-trials-50-tasks} and \ref{fig:validate-stochastic-runtimes-1000-trials-75-tasks} show the corresponding confidence interval for 25, 50 and 75 tasks respectively. 
 The results here are much better - almost all the predictions use the optimal instance type and the number of predictions outside the 95\% confidence interval is close to the error tolerance level of 5\%.
-This means the total percentage of incorrect predictions is also close to 5\%.
+So the total percentage of incorrect predictions is also close to 5\%.
 The results suggest that predicting optimal schedules using bootstrap approximation is applicable only when at least 25 tasks are assigned to an instance and cannot be used when processing fewer number of tasks per instance.
 Results (not shown) when sampling from empirical distributions for runtimes, rather than distributions with closed form expressions, are also very similar.
 
@@ -549,7 +548,7 @@ In this chapter I used two different methods to predict the optimal schedule whe
 If the number of tasks is $\geq$ 100, the makespan distribution is approximated by a Normal distribution which is then used to predict optimal instance type and makespan. 
 Prediction results are good and the percentage of incorrect prediction is around the error tolerance of 5\%. 
 If the number of tasks is $<$ 100, I use a bootstrap approximation to the makespan distribution and then predict the optimal schedule. 
-Results using this method are poor when using $\leq$ 25 tasks but improve when processing $>$ 25 tasks.
+Results using this method are poor when using $\leq$ 25 tasks but improve to expected levels when processing $>$ 25 tasks.
 These methods form the core of the method used in the next section when scheduling tasks across multiple instances.
 
 \chapter{The multiple instance case}
@@ -558,11 +557,11 @@ When scheduling tasks on single instances with the objective of minimizing makes
 When scheduling tasks on multiple instances, however, the number of possible schedules is typically very large and it is not possible to find the globally optimal schedule in a 'reasonable' amount of time.
 In fact, most scheduling problems, including the problem of minimizing makespan, are considered to be NP-hard \cite{Garey1979} and form an important class of combinatorial problems.
 
-A common algorithm to find a near-optimal schedule for deterministic runtimes when using multiple instances is called the Longest Processing Time First (LPTF) rule.
+A common algorithm to find a near-optimal schedule that minimizes makespan for deterministic runtimes when using multiple instances is called the Longest Processing Time First (LPTF) rule.
 When runtimes are stochastic and follow the Exponential distribution, the Longest Expected Processing Time First (LEPTF) rule gives a near-optimal schedule \cite{Pinedo2012}. 
 These rules first order all tasks in decreasing order of (expected) runtimes.
 They then assign the task with the largest (expected) runtime that has not yet started processing to the next available instance. 
-The schedule obtained by these rule has a makespan that is at most $\left(\frac{4}{3} - \frac{1}{3}m \right)$ greater than the makespan of the optimal schedule, where $m$ is the number of instances used by the schedule \cite{Graham1969}.
+The schedule obtained by these rules has a makespan that is at most $\left(\frac{4}{3} - \frac{1}{3m} \right)$ greater than the makespan of the optimal schedule, where $m$ is the number of instances used by the schedule \cite{Graham1969}.
 
 The proof of the near-optimality of the LEPTF rule relies on the memory-less property of the Exponential distribution, so this rule does not apply if the runtimes follow a different distribution.
 In such cases, local search methods are used to find, in a 'reasonable' amount of time, a schedule that is 'close enough' to the global optimum.
@@ -582,12 +581,14 @@ The steps below describe the simulated annealing (SA) algorithm to find the opti
 	\item \textbf{Initialization:} Select an initial feasible schedule as the current solution and compute its processing cost.
 	\item \textbf{Candidate generation:} 
 		Given a schedule, a neighboring schedule is generated by re-assigning one or more tasks between one or more instances used by the schedule.
-		Task re-assignment means moving or exchanging tasks between one or  instances.
+		Task re-assignment means moving or exchanging tasks between one or more instances.
 		The greater the proportion of tasks re-assigned or the greater the proportion of instances whose tasks are re-assigned, the more different the new schedule will be from the current schedule.
 		The proportion of tasks re-assigned and the proportion of instances whose tasks have been re-assigned together represent a 'variance' parameter. 
 		Large values of 'variance' allow for the exploration of schedules very different from the current schedule while small values result in the exploration of the neighborhood around the current schedule.
-		To strike a balance between exploring schedules that are very different from and those that are very similar to the current schedule, I fix the number of instances between which tasks can be re-assigned at 2.
-		The maximum proportion of tasks assigned to an instance that can be re-assigned is fixed at $(1/3)\textsuperscript{rd}$.
+		Ideally, we will want to use large values of 'variance' in the initial stages of the search and small values later in the search once a 'good' schedule has been found.
+		In this report, we do not vary the 'variance' but used fixed values for the proportion of tasks re-assigned and number of instances between which the tasks are re-assigned.
+		The values selected for the variance parameters attempt to strike a balance between exploring schedules that are very different from and those that are very similar to the current schedule.
+		The number of instances between which tasks can be re-assigned is fixed at 2 and the maximum proportion of tasks assigned to an instance that can be re-assigned is fixed at $(1/3)\textsuperscript{rd}$.
 
 		In each iteration, an instance used by the schedule is selected at random.
 		The number of tasks assigned to this is instance is reduced by a third and rounded up to the next integer.
@@ -611,7 +612,7 @@ The steps below describe the simulated annealing (SA) algorithm to find the opti
 		If this processing cost is less than the processing cost of the current schedule, accept the candidate schedule.
 		Else, accept the candidate schedule with a probability that is a function of the processing cost of the current schedule, the processing cost of the candidate schedule and the current temperature.
 		
-		Temperature is an important parameter of the simulated annealing algorithm and controls the move from the current schedule to the candidate schedule. 
+		\textit{Temperature} is an important parameter of the simulated annealing algorithm and controls the move from the current schedule to the candidate schedule. 
 		The simulated annealing algorithm starts off with an initial temperature and this temperature is decreased as the algorithm progresses, mimicking the annealing process in metallurgy from which the algorithm gets its name.
 		Initial higher temperatures allow moves to feasible candidate schedules with higher processing costs, resulting in exploration of different parts of the search space.
 		As temperature decreases, the probability of moving to a schedule with a higher processing cost decreases and the algorithm tends to stay close to the most recently found best schedule.
@@ -624,45 +625,57 @@ The number of iterations and the starting temperature are fixed in advance.
 A linear \textit{cooling schedule} is used where the temperature decreases linearly with each iteration.
 There is only 1 iteration at each temperature. 
 While exploring the search space, it is possible for the SA algorithm to make a series of bad moves and end up with a schedule that is considerably worse than the initial schedule.
-To prevent this, the above algorithm moves back to the best schedule determined so far whenever there is a 10\% increase in processing cost compared to the current best schedule.
+To prevent this, the algorithm moves back to the best schedule determined so far when there is a 10\% increase in processing cost compared to the current best schedule.
 This helps a lot with improving the efficiency of exploring the search space.
-The above algorithm assumes that the number of instances is fixed.
-It must be repeated for every combination of instance types and cluster size that I want to compare.
+The algorithm assumes that the number of instances is fixed.
+It must be repeated for every combination of instance types and cluster size that I want to compare to determine the optimal combination.
 
 \section{Validation}
 
 To validate the simulated annealing algorithm, I need a simulated data set where 'truth' is known.
 Here I focus on the case when runtimes are distributed according to an unknown distribution and an empirical distribution for runtimes must be obtained.
-In this report, each task is ???
-I first define a set of 83 lengths that form a representative sample of the corresponding population, where lengths range from 1 to 3000.
+As previously mentioned, each task is associated with a co-variate called length and the length can range from 1 to 3000.
+It is known that, in the general population, tasks with smaller length occur more often than tasks with larger lengths.
+I selected a set of 87 lengths that form a representative sample of the task length population (figure \ref{fig:validate-SA-task-lengths}).
 Task runtimes are assumed to be exponentially distributed to facilitate comparison with results from the LEPTF rule mentioned in the previous section.
-Since runtimes are roughly proportional to length, the parameters of the exponential distributions increase with length.
+Since runtimes are roughly proportional to length, the parameters of the exponential distributions used to generate the 'true' runtimes increase with length.
 Distributions of runtimes for tasks with a smaller length will be shifted to the left compared to those for tasks with larger lengths.
-For each of these lengths, I generated a set of 200 samples from an exponential distribution.
+For each of the 87 lengths, I generated a set of 200 samples from an exponential distribution.
 These samples represent the empirical distribution of runtimes for the set of input tasks. 
 The SA algorithm only uses the empirical distributions and does not know that they are generated from exponential distributions.
 
-To create a set of input tasks, I sampled with replacement 10 values from the set of 83 lengths.
-I assume that these tasks will be processed on 2 instances of the same type and that the benefit and deadline are given.
-The LEPTF rule is used to determine the near-optimal schedule for this set of tasks.
-The SA algorithm is also used to predict the optimal schedule for the same set of tasks and the same 2 instances.
+\begin{figure}
+\includegraphics[width=1\textwidth]{task-lengths.eps}
+\caption{\textit{Histogram of representative task lengths used for validation.}}
+\label{fig:validate-SA-task-lengths}
+\end{figure}
+
+
+As in chapter 2, I create a collection of input tasks and a set of instances that will process the tasks. 
+In this validation setup, the number of instances is fixed at 2 (both of the same instance type), the number of tasks in the collection is fixed at 10 and the benefit and deadline are given.
+To create the collection of input tasks, I sampled with replacement 10 values from the set of 87 lengths.
+The LEPTF rule is used to determine the near-optimal schedule for processing these 10 tasks on the 2 instances.
+This schedule represents the 'truth' to which the prediction of the SA algorithm will be compared.
+The SA algorithm is also used to predict the optimal schedule for the processing the same set of tasks on the same 2 instances.
 The probability of completing the tasks by the deadline and the cost of processing the tasks are calculated for both schedules.
-This process is repeated for 100 sets of input tasks and the results are compared.
+This process is repeated for 100 sets of input task collections, each with 10 tasks, and the results are compared.
 
 Figure \ref{fig:validate-SA-LEPT-scores-2inst-100iter-10tasks} shows the probability of completing the tasks by the deadline.
 Note that all probabilities are rounded to 2 digits after the decimal point.
 Schedules generated by the LEPTF rule in all 100 trials have at least 95\% probability of completing the tasks by the deadline.
 Most of the schedules generated by the SA algorithm also have a $\geq 95\%$ chance of completing the tasks by the deadline.
 But the probability for the schedules for a few trials is well below 95\%.
-I attribute this to starting from a non-feasible solution with a low probability and being unable to find a feasible schedule within the given number of iterations.
-This problem is usually remedied by starting from a feasible schedule.
-Letting the SA algorithm run longer might also help find a better schedule.
+I attribute this to being unable to find a feasible schedule within the given number of iterations.
+This problem is usually remedied by letting the SA algorithm run longer.
 
 Figure \ref{fig:validate-SA-LEPT-costs-2inst-100iter-10tasks} shows the costs associated with the same schedules. 
 Costs for schedules generated by both methods are strongly correlated (Pearson correlation = 0.98).
 But costs for SA schedules are almost uniformly lower than costs for the LEPTF for the same set of tasks.
 This is unexpected since LEPTF generates the near-optimal schedule with the near-optimal cost while SA may not always generate the optimal schedule and I expect most of the points to be on or below the diagonal line.
-I attribute this behavior to the size of the simulated data sets, each of which contains only 200 samples.
+One reason for this behavior could be the size of the simulated data sets, each of which contains only 200 samples.
+Another reason could be that the SA algorithm is actively minimizing both makespan and cost while the LEPTF rule is minimizing only makespan.
+
+The above validation study is limited in the sense that it used only a single cluster (1 instance type, 2 instances). The study can be easily extended by defining additional clusters by varying the instance type or number of instances or both and running the SA algorithm on each of these clusters. The cluster that results in the most optimal schedule should be the one used to process the input tasks.
 
 \begin{figure}
 \includegraphics[width=1\textwidth]{validate-SA-LEPT-scores-2inst-100iter-10tasks.eps}
@@ -680,7 +693,7 @@ I attribute this behavior to the size of the simulated data sets, each of which 
 \section{Summary}
 This chapter described a method that uses Simulated Annealing to find the optimal feasible schedule for a set of tasks whose runtimes follow an unknown distribution.
 The algorithm was validated using exponentially distributed runtimes and the schedules generated by the algorithm were compared to the corresponding schedules generated by the LEPTF rule.
-The results were favorable with the percentage of sub-optimal schedules being under the error tolerance of 5\%.
+The results were favorable with the percentage of sub-optimal schedules (i.e., schedules not completing the tasks by the deadline) being under the error tolerance of 5\%.
 
 
 \chapter{Conclusion and future work}
@@ -690,7 +703,7 @@ The results were favorable with the percentage of sub-optimal schedules being un
 In this report I developed methods to find optimal schedules for tasks with stochastic runtimes. 
 When processing tasks on a single instance, a Normal approximation or a bootstrap approximation to the makespan distribution was used depending on the number of tasks to be processed on the instance.
 The $95th$ percentile of this makespan distribution was used to determine the optimal schedule.
-The optimal schedule was predicted with 95\% accuracy for simulated data sets when at least 25 tasks were being processed on an instance. 
+The optimal schedule was predicted with approximately 95\% accuracy for simulated data sets when at least 25 tasks were being processed on an instance. 
 The percentage of sub-optimal predictions was around the error tolerance of 5\%. 
 When processing tasks on multiple instances, simulated annealing was used to explore the search space of feasible schedules.
 The results from the above method compared favorably to results from the LEPTF rule.
@@ -712,9 +725,9 @@ The methodology developed in the previous chapters can be extended in the follow
 	Performing a comparison similar to the one done in Fouskakis \cite{Fouskakis2001} will determine if other methods perform better than simulated annealing.
 	
 	\item \textbf{Using variable instance cost:} An important assumption in this report (see Eq. \ref{eq:def:utility:deterministic}) is that the cost of the instance on which a task is being processed is fixed.
-		Amazon Web Services has the concept of Spot Instances \cite{AWS:Spot}, where temporarily unused capacity is sold at deeply discounted prices (70-90\% off). 
-		Customers name a maximum price they are willing to pay for an instance and retain the instance as long as the spot price remains below this maximum value.
-		The spot price keeps fluctuating based on supply and demand and can vary a lot within the same hour, sometimes even going above the fixed price for the instance.
+		Amazon Web Services has the concept of Spot Instances \cite{AWS:Spot}, where temporarily unused capacity is sold at deeply discounted prices call spot prices which are 70-90\% lower than regular prices.
+		Customers specify a maximum price they are willing to pay for an instance and retain the instance as long as the spot price remains below this maximum value.
+		The spot price fluctuates based on supply and demand and can vary a lot within the same hour, sometimes even going above the fixed price for the instance.
 		This setup allows Amazon to earn income on idle capacity and gives customers a much cheaper way to process their tasks as long as they are willing to endure interruptions.
 		Taking advantage of this feature requires the development of \textit{pre-emptive} schedules where tasks can be stopped and re-started later and the prediction of future Spot prices based on the most recent set of prices to determine the maximum bid that should be placed on instance price.
 		The significant reduction of processing costs makes this a feature worth exploring further.

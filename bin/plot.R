@@ -541,6 +541,7 @@ plot.validation.results <- function (
 
 # ---- 1instance-deterministic-runtimes ----
 
+# ----------
 # Calculate makespan for deterministic runtimes
 benefit <- 30 # in dollars
 deadline <- 25 # in hours
@@ -554,51 +555,65 @@ result = get.schedule.deterministic.runtimes(instance.types, cost, benefit,
 
 
 # ---- 1instance-stochastic-runtimes-known-dist-100tasks ----
+# ==========
+
+# Validate schedule - 1 instance; 100 tasks;
+# makespan distribution approximated by Normal distribution
 start.time <- proc.time()
 validate.stochastic.runtimes(instance.types, instance.costs, num.tasks=100)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-250tasks ----
+# Validate schedule - 1 instance; 250 tasks;
+# makespan distribution approximated by Normal distribution
 start.time <- proc.time()
 validate.stochastic.runtimes(instance.types, instance.costs, num.tasks=250)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-500tasks ----
+# Validate schedule - 1 instance; 500 tasks;
+# makespan distribution approximated by Normal distribution
 start.time <- proc.time()
 validate.stochastic.runtimes(instance.types, instance.costs, num.tasks=500)
  cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-1000tasks ----
+# Validate schedule - 1 instance; 1000 tasks;
+# makespan distribution approximated by Normal distribution
 start.time <- proc.time()
 validate.stochastic.runtimes(instance.types, instance.costs, num.tasks=1000)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
   
 
 # ---- 1instance-stochastic-runtimes-known-dist-10tasks ----
+# ==========
+
+# Validate schedule - 1 instance; 10 tasks; 
+# makespan distribution approximated by bootstrap re-sampling
 start.time <- proc.time()
 validate.stochastic.runtimes.bootstrap(instance.types, instance.costs,
   num.tasks=10)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
-# ---- 1instance-stochastic-runtimes-known-dist-20tasks ----
-start.time <- proc.time()
-validate.stochastic.runtimes.bootstrap(instance.types, instance.costs,
-  num.tasks=20)
-cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
-
 # ---- 1instance-stochastic-runtimes-known-dist-25tasks ----
+# Validate schedule - 1 instance; 25 tasks;
+# makespan distribution approximated by bootstrap re-sampling
 start.time <- proc.time()
 validate.stochastic.runtimes.bootstrap(instance.types, instance.costs,
   num.tasks=25)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-50tasks ----
+# Validate schedule - 1 instance; 50 tasks;
+# makespan distribution approximated by bootstrap re-sampling
 start.time <- proc.time()
 validate.stochastic.runtimes.bootstrap(instance.types, instance.costs,
   num.tasks=50)
 cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 # ---- 1instance-stochastic-runtimes-known-dist-75tasks ----
+# Validate schedule - 1 instance; 75 tasks; 
+# makespan distribution approximated by bootstrap re-sampling
 start.time <- proc.time()
 validate.stochastic.runtimes.bootstrap(instance.types, instance.costs,
   num.tasks=75)
@@ -608,6 +623,9 @@ cat('Time taken: ', round((proc.time()-start.time)[3]/60,2), ' mins')
 
 
 # ---- SA.validation ----
+# ----------
+# Validate simulated annealing-based method
+
 task.file <- 'validate/10-tasks.jobs.tab'
 tasks <- read.table(task.file, header=T, row.names=1, stringsAsFactors=FALSE)
 task.sizes <- tasks[,2]
