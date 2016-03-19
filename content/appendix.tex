@@ -1,0 +1,1889 @@
+\chapter{Code to generate the results in Chapters 2 and 3}
+
+This is the code to generate the plots and tables in Chapters 2 and 3
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{rm}\NormalTok{(}\DataTypeTok{list =} \KeywordTok{ls}\NormalTok{())}
+
+\CommentTok{# Install devtools and use devtools to install schedulr from}
+\CommentTok{# GitHub to run simulated annealing code. This is done only}
+\CommentTok{# once for each new version of schedulr}
+\CommentTok{# install.packages('devtools')}
+\CommentTok{# devtools::install_github('niranjv/schedulr', ref='develop')}
+
+\CommentTok{# load schedulr & setup exponential runtimes dataset}
+\KeywordTok{library}\NormalTok{(schedulr)}
+
+\KeywordTok{data}\NormalTok{(m3xlarge.runtimes.expdist)}
+\NormalTok{data.env =}\StringTok{ }\KeywordTok{setup.trainingset.runtimes}\NormalTok{(}\StringTok{"m3xlarge"}\NormalTok{, m3xlarge.runtimes.expdist)}
+\NormalTok{rt <-}\StringTok{ }\KeywordTok{get}\NormalTok{(}\StringTok{"m3xlarge.runtimes"}\NormalTok{, }\DataTypeTok{envir =} \NormalTok{data.env)}
+\NormalTok{rts <-}\StringTok{ }\KeywordTok{get}\NormalTok{(}\StringTok{"m3xlarge.runtimes.summary"}\NormalTok{, }\DataTypeTok{envir =} \NormalTok{data.env)}
+
+
+\CommentTok{# init vars}
+
+\CommentTok{# assume 3 instance types available e.g., (m3.large, c3.large,}
+\CommentTok{# c4.large) in AWS EC2 with: processing speed = (3.25, 3.5, 4)}
+\CommentTok{# processing cost = (0.14, 0.105, 0.116)}
+\NormalTok{instance.types <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{"m3.large"}\NormalTok{, }\StringTok{"c3.large"}\NormalTok{, }\StringTok{"c4.large"}\NormalTok{)}
+\NormalTok{instance.speed <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{3.25}\NormalTok{, }\FloatTok{3.5}\NormalTok{, }\DecValTok{4}\NormalTok{)}
+\NormalTok{instance.costs <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{0.14}\NormalTok{, }\FloatTok{0.105}\NormalTok{, }\FloatTok{0.116}\NormalTok{)}
+
+
+\CommentTok{#' Create validation dataset}
+\CommentTok{#'}
+\CommentTok{#' Runtime for each tasks can have a different distribution}
+\CommentTok{#' Input array has the name of the distribution of the runtime for each task}
+\CommentTok{#'}
+\CommentTok{#' @param runtimes.dist Array of strings representing the distribution of}
+\CommentTok{#' runtimes. Currently, the distributions must be one of}
+\CommentTok{#' ('unif', 'poisson', 'gamma', 'exp').}
+\CommentTok{#' @return A list containing the details of the distribution of runtimes for}
+\CommentTok{#' each task in the input set of tasks}
+\NormalTok{create.validation.data <-}\StringTok{ }\NormalTok{function(runtimes.dist) \{}
+    
+    \NormalTok{num.tasks <-}\StringTok{ }\KeywordTok{NROW}\NormalTok{(runtimes.dist)}
+    \NormalTok{num.instance.types =}\StringTok{ }\KeywordTok{NROW}\NormalTok{(instance.types)}
+    
+    \NormalTok{simulated.runtimes <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\DataTypeTok{nrow =} \NormalTok{num.tasks, }\DataTypeTok{ncol =} \NormalTok{num.instance.types)}
+    \KeywordTok{colnames}\NormalTok{(simulated.runtimes) <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(}\StringTok{"runtimes."}\NormalTok{, instance.types, }
+        \DataTypeTok{sep =} \StringTok{""}\NormalTok{)}
+    
+    \NormalTok{means <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\DataTypeTok{nrow =} \NormalTok{num.tasks, }\DataTypeTok{ncol =} \NormalTok{num.instance.types)}
+    \NormalTok{vars <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\DataTypeTok{nrow =} \NormalTok{num.tasks, }\DataTypeTok{ncol =} \NormalTok{num.instance.types)}
+    \NormalTok{dist.params <-}\StringTok{ }\KeywordTok{list}\NormalTok{()}
+    
+    \NormalTok{runtimes <-}\StringTok{ }\DecValTok{1} \NormalTok{+}\StringTok{ }\NormalTok{(}\DecValTok{1}\NormalTok{:}\KeywordTok{length}\NormalTok{(runtimes.dist))/}\DecValTok{60}  \CommentTok{# baseline for params}
+    \NormalTok{for (i in }\DecValTok{1}\NormalTok{:}\KeywordTok{length}\NormalTok{(runtimes.dist)) \{}
+        
+        \NormalTok{param.a <-}\StringTok{ }\NormalTok{runtimes[i] *}\StringTok{ }\NormalTok{instance.speed[}\DecValTok{1}\NormalTok{]}
+        \NormalTok{param.b <-}\StringTok{ }\NormalTok{runtimes[i] *}\StringTok{ }\NormalTok{instance.speed[}\DecValTok{2}\NormalTok{]}
+        \NormalTok{param.c <-}\StringTok{ }\NormalTok{runtimes[i] *}\StringTok{ }\NormalTok{instance.speed[}\DecValTok{3}\NormalTok{]}
+        
+        \CommentTok{# Discrete Uniform}
+        \NormalTok{if (runtimes.dist[i] ==}\StringTok{ "unif"}\NormalTok{) \{}
+            
+            \NormalTok{means[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\NormalTok{(}\DecValTok{1} \NormalTok{+}\StringTok{ }\NormalTok{param.a)/}\DecValTok{2}
+            \NormalTok{means[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\NormalTok{(}\DecValTok{1} \NormalTok{+}\StringTok{ }\NormalTok{param.b)/}\DecValTok{2}
+            \NormalTok{means[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\NormalTok{(}\DecValTok{1} \NormalTok{+}\StringTok{ }\NormalTok{param.c)/}\DecValTok{2}
+            
+            \NormalTok{simulated.runtimes[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{runif}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, param.a)}
+            \NormalTok{simulated.runtimes[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\KeywordTok{runif}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, param.b)}
+            \NormalTok{simulated.runtimes[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\KeywordTok{runif}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, param.c)}
+            
+            \NormalTok{vars[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\NormalTok{((param.a -}\StringTok{ }\DecValTok{1}\NormalTok{)^}\DecValTok{2}\NormalTok{)/}\DecValTok{12}
+            \NormalTok{vars[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\NormalTok{((param.b -}\StringTok{ }\DecValTok{1}\NormalTok{)^}\DecValTok{2}\NormalTok{)/}\DecValTok{12}
+            \NormalTok{vars[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\NormalTok{((param.c -}\StringTok{ }\DecValTok{1}\NormalTok{)^}\DecValTok{2}\NormalTok{)/}\DecValTok{12}
+            
+            \NormalTok{dist.params[[i]] <-}\StringTok{ }\KeywordTok{list}\NormalTok{(}\DataTypeTok{dist =} \StringTok{"unif"}\NormalTok{, }\DataTypeTok{params =} \KeywordTok{c}\NormalTok{(param.a, }
+                \NormalTok{param.b, param.c))}
+        \NormalTok{\}}
+        
+        \CommentTok{# Gamma}
+        \NormalTok{if (runtimes.dist[i] ==}\StringTok{ "gamma"}\NormalTok{) \{}
+            
+            \NormalTok{means[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\NormalTok{param.a^}\DecValTok{2}
+            \NormalTok{means[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\NormalTok{param.b^}\DecValTok{2}
+            \NormalTok{means[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\NormalTok{param.c^}\DecValTok{2}
+            
+            \NormalTok{simulated.runtimes[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{rgamma}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DataTypeTok{shape =} \NormalTok{param.a, }
+                \DataTypeTok{scale =} \NormalTok{param.a)}
+            \NormalTok{simulated.runtimes[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\KeywordTok{rgamma}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DataTypeTok{shape =} \NormalTok{param.b, }
+                \DataTypeTok{scale =} \NormalTok{param.b)}
+            \NormalTok{simulated.runtimes[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\KeywordTok{rgamma}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DataTypeTok{shape =} \NormalTok{param.c, }
+                \DataTypeTok{scale =} \NormalTok{param.c)}
+            
+            \NormalTok{vars[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\NormalTok{param.a^}\DecValTok{3}
+            \NormalTok{vars[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\NormalTok{param.b^}\DecValTok{3}
+            \NormalTok{vars[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\NormalTok{param.c^}\DecValTok{3}
+            
+            \NormalTok{dist.params[[i]] <-}\StringTok{ }\KeywordTok{list}\NormalTok{(}\DataTypeTok{dist =} \StringTok{"gamma"}\NormalTok{, }\DataTypeTok{params =} \KeywordTok{c}\NormalTok{(param.a, }
+                \NormalTok{param.b, param.c))}
+        \NormalTok{\}}
+        
+        \CommentTok{# Poisson}
+        \NormalTok{if (runtimes.dist[i] ==}\StringTok{ "poisson"}\NormalTok{) \{}
+            
+            \NormalTok{param.a <-}\StringTok{ }\KeywordTok{round}\NormalTok{(param.a)}
+            \NormalTok{param.b <-}\StringTok{ }\KeywordTok{round}\NormalTok{(param.b)}
+            \NormalTok{param.c <-}\StringTok{ }\KeywordTok{round}\NormalTok{(param.c)}
+            
+            \NormalTok{means[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\NormalTok{param.a}
+            \NormalTok{means[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\NormalTok{param.b}
+            \NormalTok{means[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\NormalTok{param.c}
+            
+            \NormalTok{simulated.runtimes[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{rpois}\NormalTok{(}\DecValTok{1}\NormalTok{, param.a)}
+            \NormalTok{simulated.runtimes[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\KeywordTok{rpois}\NormalTok{(}\DecValTok{1}\NormalTok{, param.b)}
+            \NormalTok{simulated.runtimes[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\KeywordTok{rpois}\NormalTok{(}\DecValTok{1}\NormalTok{, param.c)}
+            
+            \NormalTok{vars[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\NormalTok{param.a}
+            \NormalTok{vars[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\NormalTok{param.b}
+            \NormalTok{vars[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\NormalTok{param.c}
+            
+            \NormalTok{dist.params[[i]] <-}\StringTok{ }\KeywordTok{list}\NormalTok{(}\DataTypeTok{dist =} \StringTok{"poisson"}\NormalTok{, }\DataTypeTok{params =} \KeywordTok{c}\NormalTok{(param.a, }
+                \NormalTok{param.b, param.c))}
+        \NormalTok{\}}
+        
+        \CommentTok{# Exponential}
+        \NormalTok{if (runtimes.dist[i] ==}\StringTok{ "exp"}\NormalTok{) \{}
+            
+            \NormalTok{means[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\DecValTok{1}\NormalTok{/param.a}
+            \NormalTok{means[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\DecValTok{1}\NormalTok{/param.b}
+            \NormalTok{means[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\DecValTok{1}\NormalTok{/param.c}
+            
+            \NormalTok{simulated.runtimes[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{rexp}\NormalTok{(}\DecValTok{1}\NormalTok{, param.a)}
+            \NormalTok{simulated.runtimes[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\KeywordTok{rexp}\NormalTok{(}\DecValTok{1}\NormalTok{, param.b)}
+            \NormalTok{simulated.runtimes[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\KeywordTok{rexp}\NormalTok{(}\DecValTok{1}\NormalTok{, param.c)}
+            
+            \NormalTok{vars[i, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\DecValTok{1}\NormalTok{/(param.a^}\DecValTok{2}\NormalTok{)}
+            \NormalTok{vars[i, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\DecValTok{1}\NormalTok{/(param.b^}\DecValTok{2}\NormalTok{)}
+            \NormalTok{vars[i, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\DecValTok{1}\NormalTok{/(param.c^}\DecValTok{2}\NormalTok{)}
+            
+            \NormalTok{dist.params[[i]] <-}\StringTok{ }\KeywordTok{list}\NormalTok{(}\DataTypeTok{dist =} \StringTok{"exp"}\NormalTok{, }\DataTypeTok{params =} \KeywordTok{c}\NormalTok{(param.a, }
+                \NormalTok{param.b, param.c))}
+        \NormalTok{\}}
+    \NormalTok{\}}
+    
+    \KeywordTok{return}\NormalTok{(}\KeywordTok{list}\NormalTok{(}\DataTypeTok{simulated.runtimes =} \NormalTok{simulated.runtimes, }\DataTypeTok{means =} \NormalTok{means, }
+        \DataTypeTok{vars =} \NormalTok{vars, }\DataTypeTok{dist.params =} \NormalTok{dist.params))}
+    
+\NormalTok{\}  }\CommentTok{# end function - create.validation.data}
+
+
+\CommentTok{#' Calculate makespan for deterministic runtimes}
+\CommentTok{#'}
+\CommentTok{#' For deterministic runtimes, load is the sum of runtimes of tasks assigned}
+\CommentTok{#' to an instance and makespan is the max of load across all instances.}
+\CommentTok{#'}
+\CommentTok{#' @param instance.types Array of instance types under consideration}
+\CommentTok{#' @param instance.costs Array of cost per hour for above instance types}
+\CommentTok{#' @param benefit Benefit of completing all tasks by deadline}
+\CommentTok{#' @param deadline Time by which all costs must be complete}
+\CommentTok{#' @param runtimes Deterministic runtimes for all tasks for all instance types}
+\CommentTok{#' @return A list containing the maximum utility and the instance type and}
+\CommentTok{#' makespan associated with this utility}
+\NormalTok{get.schedule.deterministic.runtimes <-}\StringTok{ }\NormalTok{function(instance.types, }
+    \NormalTok{instance.costs, benefit, deadline, runtimes) \{}
+    
+    \NormalTok{makespan <-}\StringTok{ }\KeywordTok{ceiling}\NormalTok{(}\KeywordTok{apply}\NormalTok{(runtimes, }\DecValTok{2}\NormalTok{, sum))}
+    \NormalTok{makespan.feasible <-}\StringTok{ }\NormalTok{makespan[makespan <=}\StringTok{ }\NormalTok{deadline]}
+    \NormalTok{instance.costs.feasible <-}\StringTok{ }\NormalTok{instance.costs[makespan <=}\StringTok{ }\NormalTok{deadline]}
+    \NormalTok{instance.types.feasible <-}\StringTok{ }\NormalTok{instance.types[makespan <=}\StringTok{ }\NormalTok{deadline]}
+    
+    \NormalTok{util.feasible <-}\StringTok{ }\NormalTok{benefit -}\StringTok{ }\NormalTok{(instance.costs.feasible *}\StringTok{ }\NormalTok{makespan.feasible)}
+    \NormalTok{max.util.idx <-}\StringTok{ }\KeywordTok{which.max}\NormalTok{(util.feasible)}
+    \NormalTok{max.util <-}\StringTok{ }\NormalTok{util.feasible[max.util.idx]}
+    \NormalTok{max.util.instance.type <-}\StringTok{ }\NormalTok{instance.types.feasible[max.util.idx]}
+    \NormalTok{max.util.makespan <-}\StringTok{ }\NormalTok{makespan.feasible[max.util.idx]}
+    
+    \KeywordTok{return}\NormalTok{(}\KeywordTok{list}\NormalTok{(}\DataTypeTok{max.util =} \NormalTok{max.util, }\DataTypeTok{max.util.instance.type =} \NormalTok{max.util.instance.type, }
+        \DataTypeTok{max.util.makespan =} \NormalTok{max.util.makespan))}
+    
+\NormalTok{\}  }\CommentTok{# end function - get.schedule.deterministic.runtimes}
+
+
+\CommentTok{#' Calculate schedule for large number of tasks whose runtimes are distributed}
+\CommentTok{#' according to known distributions}
+\CommentTok{#'}
+\CommentTok{#' @param instance.types Array of instance types under consideration}
+\CommentTok{#' @param instance.costs Array of cost per hour for above instance types}
+\CommentTok{#' @param benefit Benefit of completing all tasks by deadline}
+\CommentTok{#' @param deadline Time by which all costs must be complete}
+\CommentTok{#' @param means Array of means of runtime distributions}
+\CommentTok{#' @param vars Array of variances of runtime distributions}
+\CommentTok{#' @param feasible.pctl Percentile of makespan distribution. A schedule is }
+\CommentTok{#' feasible only if the deadline is greater than this percentile of the }
+\CommentTok{#' makespan distribution}
+\CommentTok{#' @return A list containing the maximum utility, instance type and details of }
+\CommentTok{#' the makespan associated with this utility}
+\NormalTok{get.schedule.stochastic.runtimes <-}\StringTok{ }\NormalTok{function(instance.types, instance.costs, }
+    \NormalTok{benefit, deadline, means, vars, feasible.pctl) \{}
+    
+    \KeywordTok{stopifnot}\NormalTok{(}\KeywordTok{dim}\NormalTok{(means) ==}\StringTok{ }\KeywordTok{dim}\NormalTok{(vars))}
+    
+    \NormalTok{means.sum <-}\StringTok{ }\KeywordTok{apply}\NormalTok{(means, }\DecValTok{2}\NormalTok{, sum)}
+    \NormalTok{vars.sum <-}\StringTok{ }\KeywordTok{apply}\NormalTok{(vars, }\DecValTok{2}\NormalTok{, sum)}
+    \NormalTok{sds <-}\StringTok{ }\KeywordTok{sqrt}\NormalTok{(vars.sum)}
+    
+    \NormalTok{makespan.pctl <-}\StringTok{ }\KeywordTok{qnorm}\NormalTok{(feasible.pctl, means.sum, sds)}
+    \NormalTok{makespan.pctl <-}\StringTok{ }\KeywordTok{ceiling}\NormalTok{(makespan.pctl)}
+    
+    \NormalTok{feasible.idx <-}\StringTok{ }\NormalTok{makespan.pctl <=}\StringTok{ }\NormalTok{deadline}
+    \NormalTok{makespan.feasible <-}\StringTok{ }\NormalTok{makespan.pctl[feasible.idx]}
+    \NormalTok{instance.cost.feasible <-}\StringTok{ }\NormalTok{instance.costs[feasible.idx]}
+    \NormalTok{instance.types.feasible <-}\StringTok{ }\NormalTok{instance.types[feasible.idx]}
+    
+    \NormalTok{util.feasible <-}\StringTok{ }\NormalTok{benefit -}\StringTok{ }\NormalTok{(instance.cost.feasible *}\StringTok{ }\NormalTok{makespan.feasible)}
+    \NormalTok{max.util <-}\StringTok{ }\KeywordTok{max}\NormalTok{(util.feasible)}
+    \NormalTok{max.util.idx <-}\StringTok{ }\KeywordTok{which.max}\NormalTok{(util.feasible)}
+    
+    \NormalTok{max.util.instance.type <-}\StringTok{ }\NormalTok{instance.types.feasible[max.util.idx]}
+    \NormalTok{max.util.makespan.feasible.pctl <-}\StringTok{ }\NormalTok{makespan.feasible[max.util.idx]}
+    
+    \CommentTok{# assuming we are summing over enough tasks that the makespn}
+    \CommentTok{# dist. is Normal}
+    \NormalTok{max.util.makespan.mean <-}\StringTok{ }\NormalTok{means.sum[max.util.idx]}
+    \NormalTok{max.util.makespan.sd <-}\StringTok{ }\NormalTok{sds[max.util.idx]}
+    \NormalTok{max.util.makespan.lo <-}\StringTok{ }\NormalTok{max.util.makespan.mean -}\StringTok{ }\FloatTok{1.96} \NormalTok{*}\StringTok{ }\NormalTok{max.util.makespan.sd}
+    \NormalTok{max.util.makespan.hi <-}\StringTok{ }\NormalTok{max.util.makespan.mean +}\StringTok{ }\FloatTok{1.96} \NormalTok{*}\StringTok{ }\NormalTok{max.util.makespan.sd}
+    
+    \KeywordTok{return}\NormalTok{(}\KeywordTok{list}\NormalTok{(}\DataTypeTok{max.util =} \NormalTok{max.util, }\DataTypeTok{max.util.instance.type =} \NormalTok{max.util.instance.type, }
+        \DataTypeTok{max.util.makespan.feasible.pctl =} \NormalTok{max.util.makespan.feasible.pctl, }
+        \DataTypeTok{max.util.makespan.mean =} \NormalTok{max.util.makespan.mean, }\DataTypeTok{max.util.makespan.lo =} \NormalTok{max.util.makespan.lo, }
+        \DataTypeTok{max.util.makespan.hi =} \NormalTok{max.util.makespan.hi))}
+    
+\NormalTok{\}  }\CommentTok{# end function - get.schedule.stochastic.runtimes}
+
+
+\CommentTok{#' Get validation results when makespan distributions are Normally distributed}
+\CommentTok{#'}
+\CommentTok{#' @param instance.types Array of instance types under consideration}
+\CommentTok{#' @param instance.costs Array of cost per hour for above instance types}
+\CommentTok{#' @param feasible.pctl Percentile of makespan distribution. A schedule is }
+\CommentTok{#' feasible only if the deadline is greater than this percentile of the }
+\CommentTok{#' makespan distribution}
+\CommentTok{#' @param num.tasks Number of input tasks}
+\CommentTok{#' @param num.trials Number of simulated data sets to process}
+\CommentTok{#' @return Nothing. This function generates a plot as a side-effect}
+\NormalTok{validate.stochastic.runtimes <-}\StringTok{ }\NormalTok{function(instance.types, instance.costs, }
+    \DataTypeTok{feasible.pctl =} \FloatTok{0.95}\NormalTok{, num.tasks, }\DataTypeTok{num.trials =} \DecValTok{1000}\NormalTok{) \{}
+    
+    \NormalTok{validation.results <-}\StringTok{ }\KeywordTok{data.frame}\NormalTok{()}
+    
+    \NormalTok{for (j in }\DecValTok{1}\NormalTok{:num.trials) \{}
+        
+        \CommentTok{# cat('Processing iteration', j, '\textbackslash{}n')}
+        
+        \NormalTok{dist <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{"unif"}\NormalTok{, }\StringTok{"poisson"}\NormalTok{, }\StringTok{"gamma"}\NormalTok{, }\StringTok{"exp"}\NormalTok{)}
+        \NormalTok{runtimes.dist <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(dist, num.tasks, }\DataTypeTok{replace =} \NormalTok{T)}
+        \NormalTok{validation.data <-}\StringTok{ }\KeywordTok{create.validation.data}\NormalTok{(runtimes.dist)}
+        
+        \CommentTok{# a realistic benefit & deadline or no schedule will be found}
+        \NormalTok{deadline =}\StringTok{ }\KeywordTok{round}\NormalTok{(}\DecValTok{4} \NormalTok{*}\StringTok{ }\KeywordTok{sum}\NormalTok{(validation.data$simulated.runtimes[, }
+            \DecValTok{1}\NormalTok{]))}
+        \NormalTok{benefit =}\StringTok{ }\NormalTok{deadline}
+        
+        \NormalTok{result.actual =}\StringTok{ }\KeywordTok{get.schedule.deterministic.runtimes}\NormalTok{(instance.types, }
+            \NormalTok{instance.costs, benefit, deadline, validation.data$simulated.runtimes)}
+        
+        \NormalTok{result.predicted =}\StringTok{ }\KeywordTok{get.schedule.stochastic.runtimes}\NormalTok{(instance.types, }
+            \NormalTok{instance.costs, benefit, deadline, validation.data$means, }
+            \NormalTok{validation.data$vars, feasible.pctl)}
+        
+        \NormalTok{validation.results[j, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\NormalTok{result.actual$max.util}
+        \NormalTok{validation.results[j, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\NormalTok{result.actual$max.util.instance.type}
+        \NormalTok{validation.results[j, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\NormalTok{result.actual$max.util.makespan}
+        
+        \NormalTok{validation.results[j, }\DecValTok{4}\NormalTok{] <-}\StringTok{ }\NormalTok{result.predicted$max.util}
+        \NormalTok{validation.results[j, }\DecValTok{5}\NormalTok{] <-}\StringTok{ }\NormalTok{result.predicted$max.util.instance.type}
+        \NormalTok{validation.results[j, }\DecValTok{6}\NormalTok{] <-}\StringTok{ }\NormalTok{result.predicted$max.util.makespan.mean}
+        \NormalTok{validation.results[j, }\DecValTok{7}\NormalTok{] <-}\StringTok{ }\NormalTok{result.predicted$max.util.makespan.lo}
+        \NormalTok{validation.results[j, }\DecValTok{8}\NormalTok{] <-}\StringTok{ }\NormalTok{result.predicted$max.util.makespan.hi}
+    \NormalTok{\}}
+    
+    \NormalTok{validation.results <-}\StringTok{ }\NormalTok{validation.results[}\KeywordTok{order}\NormalTok{(validation.results[, }
+        \DecValTok{7}\NormalTok{]), ]}
+    \NormalTok{validation.results <-}\StringTok{ }\KeywordTok{cbind}\NormalTok{(}\DecValTok{1}\NormalTok{:}\KeywordTok{NROW}\NormalTok{(validation.results), validation.results)}
+    \KeywordTok{colnames}\NormalTok{(validation.results) <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{"index"}\NormalTok{, }\StringTok{"actual.util"}\NormalTok{, }\StringTok{"actual.inst"}\NormalTok{, }
+        \StringTok{"actual.makespan"}\NormalTok{, }\StringTok{"pred.util"}\NormalTok{, }\StringTok{"pred.inst"}\NormalTok{, }\StringTok{"pred.makespan.mean"}\NormalTok{, }
+        \StringTok{"pred.makespan.lo"}\NormalTok{, }\StringTok{"pred.makespan.hi"}\NormalTok{)}
+    
+    \KeywordTok{plot.validation.results}\NormalTok{(validation.results, num.tasks, num.trials)}
+    
+\NormalTok{\}}
+
+
+\NormalTok{get.runtime.dist.bootstrap <-}\StringTok{ }\NormalTok{function(num.instance.types, dist.params) \{}
+    
+    \NormalTok{num.tasks <-}\StringTok{ }\KeywordTok{length}\NormalTok{(dist.params)}
+    
+    \NormalTok{runtime.dist <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\DataTypeTok{nrow =} \NormalTok{num.tasks, }\DataTypeTok{ncol =} \NormalTok{num.instance.types)}
+    
+    \NormalTok{for (j in }\DecValTok{1}\NormalTok{:num.tasks) \{}
+        \NormalTok{dist.type <-}\StringTok{ }\NormalTok{dist.params[[j]]$dist}
+        \NormalTok{params <-}\StringTok{ }\NormalTok{dist.params[[j]]$params}
+        \KeywordTok{stopifnot}\NormalTok{(num.instance.types <=}\StringTok{ }\KeywordTok{length}\NormalTok{(params))}
+        
+        \CommentTok{# Discrete Uniform}
+        \NormalTok{if (dist.type ==}\StringTok{ "unif"}\NormalTok{) \{}
+            \NormalTok{runtime.dist[j, ] <-}\StringTok{ }\KeywordTok{runif}\NormalTok{(num.instance.types, }\DataTypeTok{min =} \DecValTok{1}\NormalTok{, }
+                \DataTypeTok{max =} \NormalTok{params)}
+        \NormalTok{\}}
+        
+        \CommentTok{# Gamma}
+        \NormalTok{if (dist.type ==}\StringTok{ "gamma"}\NormalTok{) \{}
+            \NormalTok{runtime.dist[j, ] <-}\StringTok{ }\KeywordTok{rgamma}\NormalTok{(num.instance.types, }\DataTypeTok{shape =} \NormalTok{params, }
+                \DataTypeTok{scale =} \NormalTok{params)}
+        \NormalTok{\}}
+        
+        \CommentTok{# Poisson}
+        \NormalTok{if (dist.type ==}\StringTok{ "poisson"}\NormalTok{) \{}
+            \NormalTok{runtime.dist[j, ] <-}\StringTok{ }\KeywordTok{rpois}\NormalTok{(num.instance.types, }\DataTypeTok{lambda =} \NormalTok{params)}
+        \NormalTok{\}}
+        
+        \CommentTok{# Exponential}
+        \NormalTok{if (dist.type ==}\StringTok{ "exp"}\NormalTok{) \{}
+            \NormalTok{runtime.dist[j, ] <-}\StringTok{ }\KeywordTok{rexp}\NormalTok{(num.instance.types, }\DataTypeTok{rate =} \NormalTok{params)}
+        \NormalTok{\}}
+        
+    \NormalTok{\}  }\CommentTok{# loop over dist. for all tasks}
+    
+    
+    \KeywordTok{return}\NormalTok{(runtime.dist)}
+    
+\NormalTok{\}  }\CommentTok{# end function - get.runtime.dist.bootstrap}
+
+
+\CommentTok{#' Get runtime dist via bootstrap resampling, then get schedule}
+\CommentTok{#'}
+\CommentTok{#' @param instance.types Array of instance types under consideration}
+\CommentTok{#' @param instance.costs Array of cost per hour for above instance types}
+\CommentTok{#' @param num.tasks Number of input tasks}
+\CommentTok{#' @param num.trials Number of simulated data sets to process}
+\CommentTok{#' @param num.bootstrap.reps Number of bootstrap samples to use while generating}
+\CommentTok{#' runtime distribution}
+\CommentTok{#' @param feasible.pctl Threshold to use to detemine makespan for runtime dist.}
+\CommentTok{#' @return Nothing. This function generates a plot as a side-effect}
+\NormalTok{get.schedule.stochastic.runtimes.bootstrap <-}\StringTok{ }\NormalTok{function(instance.types, }
+    \NormalTok{instance.costs, benefit, deadline, dist.params, num.bootstrap.reps, }
+    \NormalTok{feasible.pctl) \{}
+    
+    \NormalTok{num.instance.types <-}\StringTok{ }\KeywordTok{length}\NormalTok{(instance.types)}
+    
+    \NormalTok{makespan.bootstrap.dist <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\DataTypeTok{nrow =} \NormalTok{num.bootstrap.reps, }
+        \DataTypeTok{ncol =} \NormalTok{num.instance.types)}
+    
+    \NormalTok{for (i in }\DecValTok{1}\NormalTok{:num.bootstrap.reps) \{}
+        
+        \NormalTok{if (}\DecValTok{1}\NormalTok{%%}\DecValTok{10} \NormalTok{==}\StringTok{ }\DecValTok{0}\NormalTok{) \{}
+            \KeywordTok{cat}\NormalTok{(}\StringTok{"Processing trial"}\NormalTok{, i, }\StringTok{"}\CharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+        \NormalTok{\}}
+        
+        \NormalTok{runtime.dist <-}\StringTok{ }\KeywordTok{get.runtime.dist.bootstrap}\NormalTok{(num.instance.types, }
+            \NormalTok{dist.params)}
+        \NormalTok{makespan.bootstrap.dist[i, ] <-}\StringTok{ }\KeywordTok{apply}\NormalTok{(runtime.dist, }\DecValTok{2}\NormalTok{, }
+            \NormalTok{sum)}
+    \NormalTok{\}}
+    
+    \NormalTok{makespan.pct <-}\StringTok{ }\KeywordTok{apply}\NormalTok{(makespan.bootstrap.dist, }\DecValTok{2}\NormalTok{, quantile, }
+        \DataTypeTok{prob =} \NormalTok{feasible.pctl)}
+    \NormalTok{makespan.pct <-}\StringTok{ }\KeywordTok{ceiling}\NormalTok{(makespan.pct)}
+    
+    \NormalTok{makespan.feasible <-}\StringTok{ }\NormalTok{makespan.pct[makespan.pct <=}\StringTok{ }\NormalTok{deadline]}
+    \NormalTok{instance.cost.feasible <-}\StringTok{ }\NormalTok{instance.costs[makespan.pct <=}\StringTok{ }\NormalTok{deadline]}
+    \NormalTok{instance.types.feasible <-}\StringTok{ }\NormalTok{instance.types[makespan.pct <=}\StringTok{ }\NormalTok{deadline]}
+    
+    \NormalTok{util.feasible <-}\StringTok{ }\NormalTok{benefit -}\StringTok{ }\NormalTok{(instance.cost.feasible *}\StringTok{ }\NormalTok{makespan.feasible)}
+    \NormalTok{max.util.idx <-}\StringTok{ }\KeywordTok{which.max}\NormalTok{(util.feasible)}
+    
+    
+    \KeywordTok{return}\NormalTok{(}\KeywordTok{list}\NormalTok{(}\DataTypeTok{makespan.feasible =} \NormalTok{makespan.feasible, }\DataTypeTok{util.feasible =} \NormalTok{util.feasible, }
+        \DataTypeTok{max.util =} \NormalTok{util.feasible[max.util.idx], }\DataTypeTok{max.util.dist =} \NormalTok{makespan.bootstrap.dist[, }
+            \NormalTok{max.util.idx], }\DataTypeTok{max.util.instance.type =} \NormalTok{instance.types.feasible[max.util.idx], }
+        \DataTypeTok{max.util.makespan.feasible.pctl =} \NormalTok{makespan.feasible[max.util.idx], }
+        \DataTypeTok{max.util.makespan.mean =} \KeywordTok{mean}\NormalTok{(makespan.bootstrap.dist[, }
+            \NormalTok{max.util.idx]), }\DataTypeTok{max.util.makespan.var =} \KeywordTok{var}\NormalTok{(makespan.bootstrap.dist[, }
+            \NormalTok{max.util.idx]), }\DataTypeTok{max.util.makespan.lo =} \KeywordTok{quantile}\NormalTok{(makespan.bootstrap.dist[, }
+            \NormalTok{max.util.idx], }\DataTypeTok{prob =} \FloatTok{0.025}\NormalTok{), }\DataTypeTok{max.util.makespan.hi =} \KeywordTok{quantile}\NormalTok{(makespan.bootstrap.dist[, }
+            \NormalTok{max.util.idx], }\DataTypeTok{prob =} \FloatTok{0.975}\NormalTok{)))}
+    
+\NormalTok{\}  }\CommentTok{# end function - get.schedule.stochastic.runtimes.bootstrap}
+
+
+\CommentTok{#' Get validation results when runtime distributions are obtained via bootstrap}
+\CommentTok{#' sampling}
+\CommentTok{#'}
+\CommentTok{#' @param instance.types Array of instance types under consideration}
+\CommentTok{#' @param instance.costs Array of cost per hour for above instance types}
+\CommentTok{#' @param num.tasks Number of input tasks}
+\CommentTok{#' @param num.trials Number of simulated data sets to process}
+\CommentTok{#' @param num.bootstrap.reps Number of bootstrap samples to use while generating}
+\CommentTok{#' runtime distribution}
+\CommentTok{#' @param feasible.pctl Threshold to use to detemine makespan for runtime dist.}
+\CommentTok{#' @return Nothing. This function generates a plot as a side-effect}
+\NormalTok{validate.stochastic.runtimes.bootstrap <-}\StringTok{ }\NormalTok{function(instance.types, }
+    \NormalTok{instance.costs, num.tasks, }\DataTypeTok{num.trials =} \DecValTok{1000}\NormalTok{, }\DataTypeTok{num.bootstrap.reps =} \DecValTok{1000}\NormalTok{, }
+    \DataTypeTok{feasible.pctl =} \FloatTok{0.95}\NormalTok{) \{}
+    
+    \NormalTok{validation.results <-}\StringTok{ }\KeywordTok{data.frame}\NormalTok{()}
+    
+    \NormalTok{for (j in }\DecValTok{1}\NormalTok{:num.trials) \{}
+        
+        \NormalTok{if (j%%}\DecValTok{100} \NormalTok{==}\StringTok{ }\DecValTok{0}\NormalTok{) \{}
+            \KeywordTok{cat}\NormalTok{(}\StringTok{"Processing trial"}\NormalTok{, j, }\StringTok{"}\CharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+        \NormalTok{\}}
+        
+        \NormalTok{dist.list <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{"unif"}\NormalTok{, }\StringTok{"poisson"}\NormalTok{, }\StringTok{"gamma"}\NormalTok{, }\StringTok{"exp"}\NormalTok{)}
+        \NormalTok{runtimes.dist <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(dist.list, num.tasks, }\DataTypeTok{replace =} \NormalTok{T)}
+        \NormalTok{runtimes.dist <-}\StringTok{ }\KeywordTok{rep}\NormalTok{(}\StringTok{"poisson"}\NormalTok{, num.tasks)}
+        \NormalTok{validation.data <-}\StringTok{ }\KeywordTok{create.validation.data}\NormalTok{(runtimes.dist)}
+        
+        \CommentTok{# a realistic benefit & deadline or no schedule will be found}
+        \NormalTok{deadline =}\StringTok{ }\KeywordTok{round}\NormalTok{(}\DecValTok{4} \NormalTok{*}\StringTok{ }\KeywordTok{sum}\NormalTok{(validation.data$simulated.runtimes[, }
+            \DecValTok{1}\NormalTok{]))}
+        \NormalTok{benefit =}\StringTok{ }\NormalTok{deadline}
+        
+        \CommentTok{# this is the makespan if the runtimes were deterministic}
+        \NormalTok{result.actual =}\StringTok{ }\KeywordTok{get.schedule.deterministic.runtimes}\NormalTok{(instance.types, }
+            \NormalTok{instance.costs, benefit, deadline, validation.data$simulated.runtimes)}
+        
+        \NormalTok{result.predicted =}\StringTok{ }\KeywordTok{get.schedule.stochastic.runtimes.bootstrap}\NormalTok{(instance.types, }
+            \NormalTok{instance.costs, benefit, deadline, validation.data$dist.params, }
+            \NormalTok{num.bootstrap.reps, feasible.pctl)}
+        
+        \NormalTok{validation.results[j, }\DecValTok{1}\NormalTok{] <-}\StringTok{ }\NormalTok{result.actual$max.util}
+        \NormalTok{validation.results[j, }\DecValTok{2}\NormalTok{] <-}\StringTok{ }\NormalTok{result.actual$max.util.instance.type}
+        \NormalTok{validation.results[j, }\DecValTok{3}\NormalTok{] <-}\StringTok{ }\NormalTok{result.actual$max.util.makespan}
+        
+        \NormalTok{validation.results[j, }\DecValTok{4}\NormalTok{] <-}\StringTok{ }\NormalTok{result.predicted$max.util}
+        \NormalTok{validation.results[j, }\DecValTok{5}\NormalTok{] <-}\StringTok{ }\NormalTok{result.predicted$max.util.instance.type}
+        \NormalTok{validation.results[j, }\DecValTok{6}\NormalTok{] <-}\StringTok{ }\NormalTok{result.predicted$max.util.makespan.mean}
+        \NormalTok{validation.results[j, }\DecValTok{7}\NormalTok{] <-}\StringTok{ }\NormalTok{result.predicted$max.util.makespan.lo}
+        \NormalTok{validation.results[j, }\DecValTok{8}\NormalTok{] <-}\StringTok{ }\NormalTok{result.predicted$max.util.makespan.hi}
+    \NormalTok{\}}
+    
+    \NormalTok{validation.results <-}\StringTok{ }\NormalTok{validation.results[}\KeywordTok{order}\NormalTok{(validation.results[, }
+        \DecValTok{7}\NormalTok{]), ]}
+    \NormalTok{validation.results <-}\StringTok{ }\KeywordTok{cbind}\NormalTok{(}\DecValTok{1}\NormalTok{:}\KeywordTok{NROW}\NormalTok{(validation.results), validation.results)}
+    \KeywordTok{colnames}\NormalTok{(validation.results) <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{"index"}\NormalTok{, }\StringTok{"actual.util"}\NormalTok{, }\StringTok{"actual.inst"}\NormalTok{, }
+        \StringTok{"actual.makespan"}\NormalTok{, }\StringTok{"pred.util"}\NormalTok{, }\StringTok{"pred.inst"}\NormalTok{, }\StringTok{"pred.makespan.mean"}\NormalTok{, }
+        \StringTok{"pred.makespan.lo"}\NormalTok{, }\StringTok{"pred.makespan.hi"}\NormalTok{)}
+    
+    \KeywordTok{plot.validation.results}\NormalTok{(validation.results, num.tasks, num.trials)}
+    
+\NormalTok{\}  }\CommentTok{# end function - validate.stochastic.runtimes.bootstrap}
+
+
+\CommentTok{#' Plot validation results}
+\CommentTok{#'}
+\CommentTok{#' Plot actual runtimes with 95% CI for predicted runtimes}
+\CommentTok{#'}
+\CommentTok{#' @param validation.results Matrix containing the columns (}
+\CommentTok{#'  Actual maximum utility,}
+\CommentTok{#'  Actual instance with maximum utility,}
+\CommentTok{#'  Actual makespan with maximum utility,}
+\CommentTok{#'  Predicted maximum utility,}
+\CommentTok{#'  Predicted instance type with maximum utility,}
+\CommentTok{#'  Mean of predicted makespan with maximum utility,}
+\CommentTok{#'  Lower bound of 95% CI of predicted makespan with maximum utility,}
+\CommentTok{#'  Higher bound of 95% CI of predicted makespan with maximum utility,}
+\CommentTok{#' )}
+\CommentTok{#' @param img.title Title to use in image}
+\CommentTok{#' @param img.filename Path to image file}
+\CommentTok{#' @return Nothing. This function is called for the side-effect of generating}
+\CommentTok{#' a plot in a file.}
+\NormalTok{plot.validation.results <-}\StringTok{ }\NormalTok{function(validation.results, num.tasks, }
+    \NormalTok{num.trials) \{}
+    
+    \CommentTok{# We can compare runtimes only when both the actual and}
+    \CommentTok{# predicted schedules use the same instance type}
+    \NormalTok{validation.results.matched <-}\StringTok{ }\KeywordTok{subset}\NormalTok{(validation.results, validation.results[, }
+        \DecValTok{3}\NormalTok{] ==}\StringTok{ }\NormalTok{validation.results[, }\DecValTok{6}\NormalTok{])}
+    
+    \NormalTok{outliers <-}\StringTok{ }\KeywordTok{subset}\NormalTok{(validation.results.matched, validation.results.matched[, }
+        \DecValTok{4}\NormalTok{] <}\StringTok{ }\NormalTok{validation.results.matched[, }\DecValTok{8}\NormalTok{] |}\StringTok{ }\NormalTok{validation.results.matched[, }
+        \DecValTok{4}\NormalTok{] >}\StringTok{ }\NormalTok{validation.results.matched[, }\DecValTok{9}\NormalTok{])}
+    
+    \NormalTok{outliers.pct <-}\StringTok{ }\KeywordTok{round}\NormalTok{(}\DecValTok{100} \NormalTok{*}\StringTok{ }\KeywordTok{NROW}\NormalTok{(outliers)/}\KeywordTok{NROW}\NormalTok{(validation.results.matched), }
+        \DecValTok{2}\NormalTok{)}
+    
+    \NormalTok{img.title <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(}\StringTok{"95% CI for makespan}\CharTok{\textbackslash{}n}\StringTok{"}\NormalTok{, }\DataTypeTok{sep =} \StringTok{""}\NormalTok{)}
+    \NormalTok{img.title <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(img.title, }\KeywordTok{NROW}\NormalTok{(validation.results), }\StringTok{" trials; "}\NormalTok{, }
+        \NormalTok{num.tasks, }\StringTok{" tasks/trial}\CharTok{\textbackslash{}n}\StringTok{"}\NormalTok{, }\DataTypeTok{sep =} \StringTok{""}\NormalTok{)}
+    \NormalTok{img.title <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(img.title, outliers.pct, }\StringTok{"% outliers in the "}\NormalTok{, }
+        \KeywordTok{round}\NormalTok{(}\DecValTok{100} \NormalTok{*}\StringTok{ }\KeywordTok{NROW}\NormalTok{(validation.results.matched)/}\KeywordTok{NROW}\NormalTok{(validation.results), }
+            \DecValTok{2}\NormalTok{), }\StringTok{"% of trials with matched instance types"}\NormalTok{, }\DataTypeTok{sep =} \StringTok{""}\NormalTok{)}
+    
+    \NormalTok{img.filename <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(}\StringTok{"validate-stochastic-runtimes-"}\NormalTok{, num.trials, }
+        \StringTok{"-trials-"}\NormalTok{, num.tasks, }\StringTok{"-tasks.eps"}\NormalTok{, }\DataTypeTok{sep =} \StringTok{""}\NormalTok{)}
+    
+    \NormalTok{y.lim <-}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{range}\NormalTok{(validation.results[, }\KeywordTok{c}\NormalTok{(}\DecValTok{4}\NormalTok{, }\DecValTok{8}\NormalTok{, }\DecValTok{9}\NormalTok{)]))}
+    
+    \NormalTok{img.dir <-}\StringTok{ "content/figures"}
+    \NormalTok{if (!}\KeywordTok{file.exists}\NormalTok{(img.dir)) \{}
+        \KeywordTok{dir.create}\NormalTok{(img.dir)}
+    \NormalTok{\}}
+    
+    \NormalTok{img.filepath <-}\StringTok{ }\KeywordTok{file.path}\NormalTok{(img.dir, img.filename)}
+    
+    \KeywordTok{postscript}\NormalTok{(img.filepath, }\DataTypeTok{height =} \DecValTok{7}\NormalTok{, }\DataTypeTok{width =} \DecValTok{7}\NormalTok{, }\DataTypeTok{onefile =} \OtherTok{FALSE}\NormalTok{, }
+        \DataTypeTok{horizontal =} \OtherTok{FALSE}\NormalTok{)}
+    \KeywordTok{plot}\NormalTok{(validation.results[, }\DecValTok{1}\NormalTok{], validation.results[, }\DecValTok{4}\NormalTok{], }\DataTypeTok{pch =} \DecValTok{16}\NormalTok{, }
+        \DataTypeTok{cex =} \FloatTok{0.5}\NormalTok{, }\DataTypeTok{main =} \NormalTok{img.title, }\DataTypeTok{ylim =} \NormalTok{y.lim, }\DataTypeTok{xlab =} \StringTok{"Trial #"}\NormalTok{, }
+        \DataTypeTok{ylab =} \StringTok{"Makespan (hr)"}\NormalTok{)}
+    
+    \KeywordTok{lines}\NormalTok{(validation.results[, }\DecValTok{1}\NormalTok{], validation.results[, }\DecValTok{8}\NormalTok{], }\DataTypeTok{col =} \StringTok{"red"}\NormalTok{, }
+        \DataTypeTok{lty =} \StringTok{"dotted"}\NormalTok{, }\DataTypeTok{lwd =} \DecValTok{2}\NormalTok{)}
+    
+    \KeywordTok{lines}\NormalTok{(validation.results[, }\DecValTok{1}\NormalTok{], validation.results[, }\DecValTok{9}\NormalTok{], }\DataTypeTok{col =} \StringTok{"red"}\NormalTok{, }
+        \DataTypeTok{lty =} \StringTok{"dotted"}\NormalTok{, }\DataTypeTok{lwd =} \DecValTok{2}\NormalTok{)}
+    
+    \KeywordTok{legend}\NormalTok{(}\StringTok{"bottomright"}\NormalTok{, }\DataTypeTok{legend =} \StringTok{"95% CI for predicted makespan"}\NormalTok{, }
+        \DataTypeTok{col =} \StringTok{"red"}\NormalTok{, }\DataTypeTok{lty =} \StringTok{"dotted"}\NormalTok{, }\DataTypeTok{lwd =} \DecValTok{2}\NormalTok{)}
+    \KeywordTok{dev.off}\NormalTok{()}
+    
+    \KeywordTok{cat}\NormalTok{(}\StringTok{"Created plot:"}\NormalTok{, img.filepath, }\StringTok{"}\CharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+    
+\NormalTok{\}  }\CommentTok{# end function - plot.validation.results}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# ==========}
+
+\CommentTok{# Validate schedule - 1 instance; 100 tasks; makespan}
+\CommentTok{# distribution approximated by Normal distribution}
+\NormalTok{start.time <-}\StringTok{ }\KeywordTok{proc.time}\NormalTok{()}
+\KeywordTok{validate.stochastic.runtimes}\NormalTok{(instance.types, instance.costs, }\DataTypeTok{num.tasks =} \DecValTok{100}\NormalTok{)}
+\KeywordTok{cat}\NormalTok{(}\StringTok{"Time taken: "}\NormalTok{, }\KeywordTok{round}\NormalTok{((}\KeywordTok{proc.time}\NormalTok{() -}\StringTok{ }\NormalTok{start.time)[}\DecValTok{3}\NormalTok{]/}\DecValTok{60}\NormalTok{, }\DecValTok{2}\NormalTok{), }
+    \StringTok{" mins"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# Validate schedule - 1 instance; 250 tasks; makespan}
+\CommentTok{# distribution approximated by Normal distribution}
+\NormalTok{start.time <-}\StringTok{ }\KeywordTok{proc.time}\NormalTok{()}
+\KeywordTok{validate.stochastic.runtimes}\NormalTok{(instance.types, instance.costs, }\DataTypeTok{num.tasks =} \DecValTok{250}\NormalTok{)}
+\KeywordTok{cat}\NormalTok{(}\StringTok{"Time taken: "}\NormalTok{, }\KeywordTok{round}\NormalTok{((}\KeywordTok{proc.time}\NormalTok{() -}\StringTok{ }\NormalTok{start.time)[}\DecValTok{3}\NormalTok{]/}\DecValTok{60}\NormalTok{, }\DecValTok{2}\NormalTok{), }
+    \StringTok{" mins"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# Validate schedule - 1 instance; 500 tasks; makespan}
+\CommentTok{# distribution approximated by Normal distribution}
+\NormalTok{start.time <-}\StringTok{ }\KeywordTok{proc.time}\NormalTok{()}
+\KeywordTok{validate.stochastic.runtimes}\NormalTok{(instance.types, instance.costs, }\DataTypeTok{num.tasks =} \DecValTok{500}\NormalTok{)}
+\KeywordTok{cat}\NormalTok{(}\StringTok{"Time taken: "}\NormalTok{, }\KeywordTok{round}\NormalTok{((}\KeywordTok{proc.time}\NormalTok{() -}\StringTok{ }\NormalTok{start.time)[}\DecValTok{3}\NormalTok{]/}\DecValTok{60}\NormalTok{, }\DecValTok{2}\NormalTok{), }
+    \StringTok{" mins"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# Validate schedule - 1 instance; 1000 tasks; makespan}
+\CommentTok{# distribution approximated by Normal distribution}
+\NormalTok{start.time <-}\StringTok{ }\KeywordTok{proc.time}\NormalTok{()}
+\KeywordTok{validate.stochastic.runtimes}\NormalTok{(instance.types, instance.costs, }\DataTypeTok{num.tasks =} \DecValTok{1000}\NormalTok{)}
+\KeywordTok{cat}\NormalTok{(}\StringTok{"Time taken: "}\NormalTok{, }\KeywordTok{round}\NormalTok{((}\KeywordTok{proc.time}\NormalTok{() -}\StringTok{ }\NormalTok{start.time)[}\DecValTok{3}\NormalTok{]/}\DecValTok{60}\NormalTok{, }\DecValTok{2}\NormalTok{), }
+    \StringTok{" mins"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# ==========}
+
+\CommentTok{# Validate schedule - 1 instance; 10 tasks; makespan}
+\CommentTok{# distribution approximated by bootstrap re-sampling}
+\NormalTok{start.time <-}\StringTok{ }\KeywordTok{proc.time}\NormalTok{()}
+\KeywordTok{validate.stochastic.runtimes.bootstrap}\NormalTok{(instance.types, instance.costs, }
+    \DataTypeTok{num.tasks =} \DecValTok{10}\NormalTok{)}
+\KeywordTok{cat}\NormalTok{(}\StringTok{"Time taken: "}\NormalTok{, }\KeywordTok{round}\NormalTok{((}\KeywordTok{proc.time}\NormalTok{() -}\StringTok{ }\NormalTok{start.time)[}\DecValTok{3}\NormalTok{]/}\DecValTok{60}\NormalTok{, }\DecValTok{2}\NormalTok{), }
+    \StringTok{" mins"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# Validate schedule - 1 instance; 25 tasks; makespan}
+\CommentTok{# distribution approximated by bootstrap re-sampling}
+\NormalTok{start.time <-}\StringTok{ }\KeywordTok{proc.time}\NormalTok{()}
+\KeywordTok{validate.stochastic.runtimes.bootstrap}\NormalTok{(instance.types, instance.costs, }
+    \DataTypeTok{num.tasks =} \DecValTok{25}\NormalTok{)}
+\KeywordTok{cat}\NormalTok{(}\StringTok{"Time taken: "}\NormalTok{, }\KeywordTok{round}\NormalTok{((}\KeywordTok{proc.time}\NormalTok{() -}\StringTok{ }\NormalTok{start.time)[}\DecValTok{3}\NormalTok{]/}\DecValTok{60}\NormalTok{, }\DecValTok{2}\NormalTok{), }
+    \StringTok{" mins"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# Validate schedule - 1 instance; 50 tasks; makespan}
+\CommentTok{# distribution approximated by bootstrap re-sampling}
+\NormalTok{start.time <-}\StringTok{ }\KeywordTok{proc.time}\NormalTok{()}
+\KeywordTok{validate.stochastic.runtimes.bootstrap}\NormalTok{(instance.types, instance.costs, }
+    \DataTypeTok{num.tasks =} \DecValTok{50}\NormalTok{)}
+\KeywordTok{cat}\NormalTok{(}\StringTok{"Time taken: "}\NormalTok{, }\KeywordTok{round}\NormalTok{((}\KeywordTok{proc.time}\NormalTok{() -}\StringTok{ }\NormalTok{start.time)[}\DecValTok{3}\NormalTok{]/}\DecValTok{60}\NormalTok{, }\DecValTok{2}\NormalTok{), }
+    \StringTok{" mins"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# Validate schedule - 1 instance; 75 tasks; makespan}
+\CommentTok{# distribution approximated by bootstrap re-sampling}
+\NormalTok{start.time <-}\StringTok{ }\KeywordTok{proc.time}\NormalTok{()}
+\KeywordTok{validate.stochastic.runtimes.bootstrap}\NormalTok{(instance.types, instance.costs, }
+    \DataTypeTok{num.tasks =} \DecValTok{75}\NormalTok{)}
+\KeywordTok{cat}\NormalTok{(}\StringTok{"Time taken: "}\NormalTok{, }\KeywordTok{round}\NormalTok{((}\KeywordTok{proc.time}\NormalTok{() -}\StringTok{ }\NormalTok{start.time)[}\DecValTok{3}\NormalTok{]/}\DecValTok{60}\NormalTok{, }\DecValTok{2}\NormalTok{), }
+    \StringTok{" mins"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\chapter{Code for \emph{schedulr} R package}
+
+This is the code for the schedulr R package
+
+\begin{Shaded}
+\begin{Highlighting}[]
+  \NormalTok{## @knitr all}
+  
+  \CommentTok{# Functions for Simulated annealing}
+  
+  
+  \NormalTok{data.env <-}\StringTok{ }\KeywordTok{new.env}\NormalTok{()}
+  
+  \CommentTok{# If an instance has more than bootstrap.threshold tasks, use Normal approx.}
+  \CommentTok{# to get runtime dist., instead of generating bootstrap samples}
+  \NormalTok{bootstrap.threshold <-}\StringTok{ }\DecValTok{50}
+  \NormalTok{num.bootstrap.reps <-}\StringTok{ }\DecValTok{1000}
+  
+  \NormalTok{instance.types <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{'m3.xlarge'}\NormalTok{)}
+  \NormalTok{instance.speed <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{3.25}\NormalTok{)}
+  \NormalTok{instance.costs <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{0.28}\NormalTok{)}
+  
+  \CommentTok{# -----}
+  \CommentTok{# Internal functions for validating input}
+  \CommentTok{# -----}
+  
+  
+  \CommentTok{#' Validate that the input value is a positive integer (test single number,}
+  \CommentTok{#' not array)}
+  \CommentTok{#'}
+  \CommentTok{#' @param val The value to validate}
+  \CommentTok{#' @examples}
+  \CommentTok{#' check.if.positive.integer()}
+  \CommentTok{#' check.if.positive.integer(c())}
+  \CommentTok{#' check.if.positive.integer('')}
+  \CommentTok{#' check.if.positive.integer(5)}
+  \CommentTok{#' check.if.positive.integer(0)}
+  \CommentTok{#' check.if.positive.integer(-10)}
+  \CommentTok{#' check.if.positive.integer(3.14)}
+  \CommentTok{#' check.if.positive.integer(1:2)}
+  \CommentTok{#' check.if.positive.integer('a')}
+  \NormalTok{.check.if.positive.integer <-}\StringTok{ }\NormalTok{function (value) \{}
+  
+    \KeywordTok{.check.if.nonnegative.integer}\NormalTok{(value)}
+    \NormalTok{value >}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument: Value must be > 0"}\NormalTok{)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .check.if.positive.integer}
+  
+  
+  \CommentTok{#' Validate that the input value is a non-negative integer (test single number,}
+  \CommentTok{#' not array)}
+  \CommentTok{#'}
+  \CommentTok{#' @param val The value to validate}
+  \CommentTok{#' @examples}
+  \CommentTok{#' check.if.nonnegative.integer()}
+  \CommentTok{#' check.if.nonnegative.integer(c())}
+  \CommentTok{#' check.if.nonnegative.integer('')}
+  \CommentTok{#' check.if.nonnegative.integer(5)}
+  \CommentTok{#' check.if.nonnegative.integer(0)}
+  \CommentTok{#' check.if.nonnegative.integer(-10)}
+  \CommentTok{#' check.if.nonnegative.integer(3.14)}
+  \CommentTok{#' check.if.nonnegative.integer(1:2)}
+  \CommentTok{#' check.if.nonnegative.integer('a')}
+  \NormalTok{.check.if.nonnegative.integer <-}\StringTok{ }\NormalTok{function (value) \{}
+  
+    \NormalTok{!}\KeywordTok{missing}\NormalTok{(value) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Missing required argument: Must specify a value"}\NormalTok{)}
+    \KeywordTok{length}\NormalTok{(value) ==}\StringTok{ }\DecValTok{1} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument length:}
+\StringTok{      Must specify a single number"}\NormalTok{)}
+    \NormalTok{(}\KeywordTok{is.numeric}\NormalTok{(value) &&}\StringTok{ }\NormalTok{value ==}\StringTok{ }\KeywordTok{floor}\NormalTok{(value)) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{'Non-integer argument:}
+\StringTok{      value'}\NormalTok{)}
+    \NormalTok{value >=}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument: Value must be >= 0"}\NormalTok{)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .check.if.nonnegative.integer}
+  
+  
+  \CommentTok{#' Verify that the input value is a positive real (test arrays)}
+  \CommentTok{#'}
+  \CommentTok{#' @param value Array of values to validate}
+  \CommentTok{#' @examples}
+  \CommentTok{#' .check.if.positive.real()}
+  \CommentTok{#' .check.if.positive.real(c())}
+  \CommentTok{#' .check.if.positive.real('')}
+  \CommentTok{#' .check.if.positive.real(0)}
+  \CommentTok{#' .check.if.positive.real(1)}
+  \CommentTok{#' .check.if.positive.real(3.14)}
+  \CommentTok{#' .check.if.positive.real(-5)}
+  \CommentTok{#' .check.if.positive.real(c(1.2, 3.4))}
+  \CommentTok{#' .check.if.positive.real('a')}
+  \NormalTok{.check.if.positive.real <-}\StringTok{ }\NormalTok{function (value) \{}
+  
+    \KeywordTok{.check.if.nonnegative.real}\NormalTok{(value)}
+    \KeywordTok{all}\NormalTok{(value >}\StringTok{ }\DecValTok{0}\NormalTok{) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{'Invalid argument: Value must be > 0'}\NormalTok{)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .check.if.positive.real}
+  
+  
+  \CommentTok{#' Verify that the input value is a non-negative real (test arrays)}
+  \CommentTok{#'}
+  \CommentTok{#' @param value Array of values to validate}
+  \CommentTok{#' @examples}
+  \CommentTok{#' .check.if.nonnegative.real()}
+  \CommentTok{#' .check.if.nonnegative.real(c())}
+  \CommentTok{#' .check.if.nonnegative.real('')}
+  \CommentTok{#' .check.if.nonnegative.real(0)}
+  \CommentTok{#' .check.if.nonnegative.real(1)}
+  \CommentTok{#' .check.if.nonnegative.real(c(1.2, 3.4))}
+  \CommentTok{#' .check.if.nonnegative.real(3.14)}
+  \CommentTok{#' .check.if.nonnegative.real('a')}
+  \NormalTok{.check.if.nonnegative.real <-}\StringTok{ }\NormalTok{function (value) \{}
+  
+    \NormalTok{!}\KeywordTok{missing}\NormalTok{(value) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{'Missing required argument: Must specify a value'}\NormalTok{)}
+    \KeywordTok{length}\NormalTok{(value) >}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{'Invalid argument length: Must specify a value'}\NormalTok{)}
+    \KeywordTok{is.numeric}\NormalTok{(value) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{'Non-numeric argument:}
+\StringTok{      Must specify a valid +ve real number'}\NormalTok{)}
+    \KeywordTok{all}\NormalTok{(value >=}\StringTok{ }\DecValTok{0}\NormalTok{) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{'Invalid argument: Value must be >= 0'}\NormalTok{)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .check.if.nonnegative.real}
+  
+  
+  \CommentTok{#' Verify that schedule is valid}
+  \CommentTok{#'}
+  \CommentTok{#' @param schedule Array of task sizes}
+  \CommentTok{#' @examples}
+  \CommentTok{#' a <- get.initial.schedule(2, 3)}
+  \CommentTok{#' .validate.schedule(a)}
+  \CommentTok{#' .validate.schedule(b<-NULL)}
+  \NormalTok{.validate.schedule <-}\StringTok{ }\NormalTok{function (schedule) \{}
+  
+    \NormalTok{!}\KeywordTok{missing}\NormalTok{(schedule) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Missing required argument: schedule"}\NormalTok{)}
+    \KeywordTok{is.list}\NormalTok{(schedule) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument type:}
+\StringTok{      schedule must be a list"}\NormalTok{)}
+    \KeywordTok{length}\NormalTok{(schedule) !=}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument length:}
+\StringTok{      schedule must contain at least 1 instance"}\NormalTok{)}
+    \KeywordTok{is.numeric}\NormalTok{(}\KeywordTok{unlist}\NormalTok{(schedule)) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Non-numeric argument:}
+\StringTok{      tasks sizes must be valid numbers"}\NormalTok{)}
+    \KeywordTok{sum}\NormalTok{(}\KeywordTok{unlist}\NormalTok{(schedule) <=}\StringTok{ }\DecValTok{0}\NormalTok{) ==}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      tasks sizes must be > 0"}\NormalTok{)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .validate.schedule}
+  
+  
+  
+  \CommentTok{#' Verify that schedule attributes are valid}
+  \CommentTok{#'}
+  \CommentTok{#' @param schedule Array of task sizes}
+  \CommentTok{#' @examples}
+  \CommentTok{#' a <- get.initial.schedule(2, c(10))}
+  \CommentTok{#' .validate.schedule.attributes(a)}
+  \CommentTok{#' attr(a, 'score') <- 0}
+  \CommentTok{#' attr(a, 'runtime95pct') <- 0}
+  \CommentTok{#' attr(a, 'runtime99pct') <- 0}
+  \CommentTok{#' .validate.schedule.attributes(a)}
+  \NormalTok{.validate.schedule.attributes <-}\StringTok{ }\NormalTok{function (schedule) \{}
+  
+    \KeywordTok{is.numeric}\NormalTok{(}\KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'score'}\NormalTok{)) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      schedule score must be a valid number"}\NormalTok{)}
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'score'}\NormalTok{) >=}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      schedule score must be >= 0"}\NormalTok{)}
+  
+    \KeywordTok{is.numeric}\NormalTok{(}\KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'deadline'}\NormalTok{)) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      schedule deadline must be a valid number"}\NormalTok{)}
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'deadline'}\NormalTok{) >}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      deadline must be > 0"}\NormalTok{)}
+  
+    \KeywordTok{is.numeric}\NormalTok{(}\KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'runtime95pct'}\NormalTok{)) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      schedule runtime95pct must be a valid number"}\NormalTok{)}
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'runtime95pct'}\NormalTok{) >=}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      schedule runtime95pct must be >= 0"}\NormalTok{)}
+  
+    \KeywordTok{is.numeric}\NormalTok{(}\KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'runtime99pct'}\NormalTok{)) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      schedule runtime99pct must be a valid number"}\NormalTok{)}
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'runtime99pct'}\NormalTok{) >=}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      schedule runtime99pct must be >= 0"}\NormalTok{)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .validate.schedule}
+  
+  
+  
+  \CommentTok{#' Verify that the schedule has the minimum number of tasks required}
+  \CommentTok{#'}
+  \CommentTok{#' @param schedule List mapping tasks to instances}
+  \CommentTok{#' @param min.num.tasks Minimum number of tasks in schedule}
+  \CommentTok{#' @examples}
+  \CommentTok{#' a <- get.initial.schedule(2, c(10))}
+  \CommentTok{#' .validate.num.tasks.in.schedule(a, 2)}
+  \CommentTok{#' .validate.num.tasks.in.schedule(a, 5)}
+  \NormalTok{.validate.num.tasks.in.schedule <-}\StringTok{ }\NormalTok{function (schedule, num.tasks.required) \{}
+  
+    \NormalTok{num.tasks.available <-}\StringTok{ }\KeywordTok{length}\NormalTok{(}\KeywordTok{unlist}\NormalTok{(schedule))}
+    \NormalTok{if (num.tasks.available >=}\StringTok{ }\NormalTok{num.tasks.required) \{}
+      \KeywordTok{return} \NormalTok{(}\OtherTok{TRUE}\NormalTok{)}
+    \NormalTok{\} else \{}
+      \KeywordTok{return} \NormalTok{(}\OtherTok{FALSE}\NormalTok{)}
+    \NormalTok{\} }\CommentTok{# end if - move more tasks than available?}
+  
+  \NormalTok{\} }\CommentTok{# end function .validate.num.tasks.in.schedule}
+  
+  
+  \CommentTok{#' Verify that runtimes are valid values}
+  \CommentTok{#'}
+  \CommentTok{#' @param runtimes Matrix of runtime of past runs for the given instance type}
+  \CommentTok{#' Each row in the matrix represents a single training sample and has 2 columns.}
+  \CommentTok{#' The size column is the size of task that was processed.}
+  \CommentTok{#' The runtime_sec column is the time taken to process the task in seconds.}
+  \CommentTok{#' @examples}
+  \CommentTok{#' r <- matrix(c(1,1), nrow=1, ncol=2)}
+  \CommentTok{#' .validate.runtimes.summary(r)}
+  \NormalTok{.validate.runtimes <-}\StringTok{ }\NormalTok{function (runtimes) \{}
+  
+    \NormalTok{!}\KeywordTok{missing}\NormalTok{(runtimes) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Missing required argument:}
+\StringTok{      Must specify a numeric matrix with 2 columns"}\NormalTok{)}
+    \KeywordTok{is.matrix}\NormalTok{(runtimes) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument type:}
+\StringTok{      Must specify a numeric matrix with 2 columns"}\NormalTok{)}
+    \KeywordTok{NCOL}\NormalTok{(runtimes) ==}\StringTok{ }\DecValTok{2} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument dimensions:}
+\StringTok{      Must specify a numeric matrix with 2 columns"}\NormalTok{)}
+    \KeywordTok{NROW}\NormalTok{(runtimes) >}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument dimensions:}
+\StringTok{      Must specify a numeric matrix with 2 columns and at least 1 row"}\NormalTok{)}
+    \KeywordTok{is.numeric}\NormalTok{(runtimes) ||}\StringTok{ }\KeywordTok{stop} \NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      Must specify a numeric matrix with 2 columns"}\NormalTok{)}
+    \KeywordTok{all}\NormalTok{(runtimes[,}\DecValTok{1}\NormalTok{] >}\StringTok{ }\DecValTok{0}\NormalTok{) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      1st column (size) must have positive values"}\NormalTok{)}
+    \KeywordTok{all}\NormalTok{(runtimes[,}\DecValTok{2}\NormalTok{] >=}\StringTok{ }\DecValTok{0}\NormalTok{) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      2nd column (runtime) must have positive values"}\NormalTok{)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .validate.runtimes}
+  
+  
+  
+  \CommentTok{#' Verify that runtime summaries are valid values}
+  \CommentTok{#'}
+  \CommentTok{#' @param runtimes.summary Numeric matrix containing mean}
+  \CommentTok{#' and variance of runtimes for each size}
+  \CommentTok{#' @examples}
+  \CommentTok{#' rs <- matrix(c(1,1,1), nrow=1, ncol=3)}
+  \CommentTok{#' .validate.runtimes.summary(rs)}
+  \NormalTok{.validate.runtimes.summary <-}\StringTok{ }\NormalTok{function (runtimes.summary) \{}
+  
+    \NormalTok{!}\KeywordTok{missing}\NormalTok{(runtimes.summary) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Missing required argument:}
+\StringTok{      Must specify a numeric matrix with 2 columns"}\NormalTok{)}
+    \KeywordTok{is.matrix}\NormalTok{(runtimes.summary) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument type:}
+\StringTok{      Must specify a numeric matrix with 2 columns"}\NormalTok{)}
+    \KeywordTok{NCOL}\NormalTok{(runtimes.summary) ==}\StringTok{ }\DecValTok{3} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument dimensions:}
+\StringTok{      Must specify a numeric matrix with 3 columns"}\NormalTok{)}
+    \KeywordTok{NROW}\NormalTok{(runtimes.summary) >}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument dimensions:}
+\StringTok{      Must specify a numeric matrix with 2 columns and at least 1 row"}\NormalTok{)}
+    \KeywordTok{is.numeric}\NormalTok{(runtimes.summary) ||}\StringTok{ }\KeywordTok{stop} \NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      Must specify a numeric matrix with 2 columns"}\NormalTok{)}
+    \KeywordTok{all}\NormalTok{(runtimes.summary[,}\DecValTok{1}\NormalTok{] >}\StringTok{ }\DecValTok{0}\NormalTok{) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      1st column (size) must have positive values"}\NormalTok{)}
+    \KeywordTok{all}\NormalTok{(runtimes.summary[,}\DecValTok{2}\NormalTok{] >}\StringTok{ }\DecValTok{0}\NormalTok{) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{      2nd column (runtime) must have positive values"}\NormalTok{)}
+    \KeywordTok{all}\NormalTok{(runtimes.summary[,}\DecValTok{3}\NormalTok{] >=}\StringTok{ }\DecValTok{0}\NormalTok{) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument:}
+\StringTok{    3rd column (var(runtimes)) cannot have negative values"}\NormalTok{)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .validate.runtimes.summary}
+  
+  
+  
+  \NormalTok{.validate.instance.type <-}\StringTok{ }\NormalTok{function (instance.type) \{}
+  
+    \NormalTok{!}\KeywordTok{missing}\NormalTok{(instance.type) ||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Missing required argument:}
+\StringTok{      Must specify instance.type"}\NormalTok{)}
+    \KeywordTok{length}\NormalTok{(instance.type) !=}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument length:}
+\StringTok{      instance.type must be a string"}\NormalTok{)}
+    \KeywordTok{nchar}\NormalTok{(instance.type) >}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument length:}
+\StringTok{      instance.type must be a string"}\NormalTok{)}
+    \KeywordTok{is.character}\NormalTok{(instance.type) ||}\StringTok{ }\KeywordTok{stop} \NormalTok{(}\StringTok{"Invalid argument type:}
+\StringTok{      instance.type must be a string"}\NormalTok{)}
+    \KeywordTok{NROW}\NormalTok{(instance.type) ==}\StringTok{ }\DecValTok{1} \NormalTok{||}\StringTok{ }\KeywordTok{stop} \NormalTok{(}\StringTok{"Invalid argument length:}
+\StringTok{      instance.type must be a string, not a vector of strings"}\NormalTok{)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .validate.runtimes}
+  
+  
+  \CommentTok{# -----}
+  \CommentTok{# Other internal functions}
+  \CommentTok{# -----}
+  
+  
+  \CommentTok{#' Get runtimes for instance type}
+  \CommentTok{#'}
+  \CommentTok{#' @inheritParams setup.trainingset.runtimes}
+  \CommentTok{#' @param summary Return only summary of runtimes.}
+  \CommentTok{#' @return}
+  \CommentTok{#' If summary=F, return value is a matrix of runtimes for the given}
+  \CommentTok{#' instance type.}
+  \CommentTok{#' Each row in the matrix represents a single trial and has 2 columns.}
+  \CommentTok{#' The 1st column is the size of task that was processed and}
+  \CommentTok{#' the 2nd column is the runtime for this size.}
+  \CommentTok{#' If summary=T, return value is a matrix of summary of runtimes for the given}
+  \CommentTok{#' instance type. Each row in the matrix represents a single size and has}
+  \CommentTok{#' 3 columns.}
+  \CommentTok{#' The 1st column is the size of task that was processed,}
+  \CommentTok{#' the 2nd column is the mean runtime for this size and}
+  \CommentTok{#' the 3rd column is the variance of the runtimes for this size}
+  \CommentTok{#' @examples}
+  \CommentTok{#' .get.trainingset.runtimes('m3xlarge')}
+  \NormalTok{.get.trainingset.runtimes <-}\StringTok{ }\NormalTok{function (instance.type, }\DataTypeTok{summary=}\NormalTok{F) \{}
+  
+    \NormalTok{if (summary) \{}
+      \NormalTok{varname <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(instance.type, }\StringTok{'.runtimes.summary'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+    \NormalTok{\} else \{}
+      \NormalTok{varname <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(instance.type, }\StringTok{'.runtimes'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+    \NormalTok{\} }\CommentTok{# end if - get summary?}
+  
+    \KeywordTok{exists}\NormalTok{(varname, }\DataTypeTok{envir=}\NormalTok{data.env) ||}
+\StringTok{      }\KeywordTok{stop}\NormalTok{(}\StringTok{"Runtimes for "}\NormalTok{, instance.type, }\StringTok{" not setup correctly"}\NormalTok{)}
+    \NormalTok{var <-}\StringTok{ }\KeywordTok{get}\NormalTok{(varname, }\DataTypeTok{envir=}\NormalTok{data.env) }\CommentTok{# get var from internal env (data.env)}
+    \KeywordTok{return} \NormalTok{(var)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .get.trainingset.runtimes}
+  
+  
+  
+  \CommentTok{#' Get initial schedule of tasks to instances in a cluster}
+  \CommentTok{#'}
+  \CommentTok{#' Tasks are randomly assigned to instances}
+  \CommentTok{#'}
+  \CommentTok{#' @inheritParams get.initial.schedule}
+  \CommentTok{#' @return List containing a mapping of tasks to instances in cluster.}
+  \CommentTok{#' The list index represents the id of an instance in the cluster while}
+  \CommentTok{#' the associated list member represents the task assigned to that instance}
+  \CommentTok{#' @examples}
+  \CommentTok{#' schedule <- get.initial.schedule.random(4, 1:30)}
+  \NormalTok{.get.initial.schedule.random <-}\StringTok{ }\NormalTok{function (cluster.size, task.sizes) \{}
+  
+    \NormalTok{schedule <-}\StringTok{ }\KeywordTok{vector}\NormalTok{(}\StringTok{'list'}\NormalTok{, cluster.size)}
+    \NormalTok{num.tasks <-}\StringTok{ }\KeywordTok{length}\NormalTok{(task.sizes)}
+    \NormalTok{idx.shuffle <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(num.tasks, }\DataTypeTok{replace=}\NormalTok{F)}
+    \NormalTok{shuffled.task.sizes <-}\StringTok{ }\NormalTok{task.sizes[idx.shuffle]}
+  
+    \NormalTok{for (i in }\DecValTok{1}\NormalTok{:num.tasks) \{}
+  
+      \CommentTok{# get random instance}
+      \NormalTok{inst <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\KeywordTok{length}\NormalTok{(schedule), }\DecValTok{1}\NormalTok{)}
+        \NormalTok{schedule[[inst]] <-}\StringTok{ }\KeywordTok{c}\NormalTok{(schedule[[inst]], shuffled.task.sizes[i])}
+  
+    \NormalTok{\} }\CommentTok{# end for - loop over all tasks in order}
+  
+    \KeywordTok{return} \NormalTok{(schedule)}
+  
+  \NormalTok{\} }\CommentTok{# end function - get.initial.schedule.random}
+  
+  
+  
+  \CommentTok{#' Get initial schedule of tasks to instances in a cluster}
+  \CommentTok{#'}
+  \CommentTok{#' Tasks are assigned to instances in decreasing order of expected processing}
+  \CommentTok{#' time (i.e., Longest Expected Processing Time First rule)}
+  \CommentTok{#'}
+  \CommentTok{#' @inheritParams get.initial.schedule}
+  \CommentTok{#' @return List containing a mapping of tasks to instances in cluster.}
+  \CommentTok{#' The list index represents the id of an instance in the cluster while the}
+  \CommentTok{#' associated list member represents the task assigned to that instance}
+  \CommentTok{#' @examples}
+  \CommentTok{#' rs <- matrix(nrow=2, ncol=3)}
+  \CommentTok{#' rs[1,1] <- 10; rs[1,2] <- 23.5; rs[1,3] <- 2.5}
+  \CommentTok{#' rs[2,1] <- 20; rs[2,2] <- 33.5; rs[2,3] <- 3.5}
+  \CommentTok{#' schedule <- get.initial.schedule.leptf(2, rep(c(1,2), 3), rs)}
+  \NormalTok{.get.initial.schedule.leptf <-}\StringTok{ }\NormalTok{function (cluster.size, task.sizes,}
+    \NormalTok{runtimes.summary) \{}
+  
+    \NormalTok{schedule <-}\StringTok{ }\KeywordTok{vector}\NormalTok{(}\StringTok{'list'}\NormalTok{, cluster.size)}
+    \CommentTok{# to keep track of total runtimes in each instance}
+    \NormalTok{total.runtimes <-}\StringTok{ }\KeywordTok{array}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DataTypeTok{dim=}\NormalTok{cluster.size)}
+    \NormalTok{num.tasks <-}\StringTok{ }\KeywordTok{length}\NormalTok{(task.sizes)}
+  
+    \NormalTok{means <-}\StringTok{ }\KeywordTok{sapply}\NormalTok{(task.sizes, function (x) \{}
+      \NormalTok{idx <-}\StringTok{ }\KeywordTok{which}\NormalTok{(runtimes.summary[,}\DecValTok{1}\NormalTok{] ==}\StringTok{ }\NormalTok{x); }\KeywordTok{return}\NormalTok{(runtimes.summary[idx,}\DecValTok{2}\NormalTok{])}
+    \NormalTok{\})}
+    \NormalTok{size.means <-}\StringTok{ }\KeywordTok{cbind}\NormalTok{(task.sizes, means)}
+    \NormalTok{size.means <-}\StringTok{ }\NormalTok{size.means[}\KeywordTok{order}\NormalTok{(size.means[,}\DecValTok{2}\NormalTok{], }\DataTypeTok{decreasing=}\OtherTok{TRUE}\NormalTok{), ]}
+    \NormalTok{if (}\KeywordTok{class}\NormalTok{(size.means) ==}\StringTok{ 'numeric'}\NormalTok{) size.means <-}\StringTok{ }\KeywordTok{as.matrix}\NormalTok{(}\KeywordTok{t}\NormalTok{(size.means))}
+    \KeywordTok{colnames}\NormalTok{(size.means) <-}\StringTok{ }\OtherTok{NULL}
+    \KeywordTok{rownames}\NormalTok{(size.means) <-}\StringTok{ }\OtherTok{NULL}
+  
+    \NormalTok{for (i in }\DecValTok{1}\NormalTok{:num.tasks) \{}
+  
+        \NormalTok{instance.with.smallest.total.runtime <-}\StringTok{ }\KeywordTok{which.min}\NormalTok{(total.runtimes)}
+        \CommentTok{# if multiple elements in list have the lowest value,}
+      \CommentTok{# which.min returns the first. For our purposes, it doesn't matter which of}
+      \CommentTok{# the instances with the lowest total is used next.}
+  
+        \NormalTok{schedule[[instance.with.smallest.total.runtime]] <-}
+\StringTok{      }\KeywordTok{c}\NormalTok{(schedule[[instance.with.smallest.total.runtime]], size.means[i,}\DecValTok{1}\NormalTok{])}
+      \NormalTok{total.runtimes[instance.with.smallest.total.runtime] <-}
+\StringTok{      }\NormalTok{total.runtimes[instance.with.smallest.total.runtime] +}\StringTok{ }\NormalTok{size.means[i,}\DecValTok{2}\NormalTok{]}
+  
+    \NormalTok{\} }\CommentTok{# end for - loop over all tasks in order}
+  
+    \KeywordTok{return} \NormalTok{(schedule)}
+  
+  \NormalTok{\} }\CommentTok{# end function - get.initial.schedule.leptf}
+  
+  
+  
+  \CommentTok{#' Get list of instances that have the minimum number of tasks required}
+  \NormalTok{.get.admissable.instances <-}\StringTok{ }\NormalTok{function (schedule, num.tasks.per.instance,}
+                                        \NormalTok{num.instances.to.use) \{}
+  
+    \NormalTok{num.tasks.in.instances <-}\StringTok{ }\KeywordTok{lapply}\NormalTok{(schedule, length)}
+    \NormalTok{admissable.instances <-}
+\StringTok{      }\KeywordTok{which}\NormalTok{(num.tasks.in.instances >=}\StringTok{ }\NormalTok{num.tasks.per.instance)}
+    \KeywordTok{return} \NormalTok{(admissable.instances)}
+  \NormalTok{\} }\CommentTok{# end function - get.admissable.instances}
+  
+  
+  
+  \CommentTok{#' Get number of instances depending on whether to exchange tasks or move tasks}
+  \NormalTok{.get.num.instances <-}\StringTok{ }\NormalTok{function (exchange) \{}
+    \NormalTok{num.instances <-}\StringTok{ }\DecValTok{1}
+    \NormalTok{if (exchange) num.instances <-}\StringTok{ }\DecValTok{2}
+  
+    \KeywordTok{return} \NormalTok{(num.instances)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .get.num.instances}
+  
+  
+  
+  \CommentTok{#' Get temperature for current iteration}
+  \CommentTok{#'}
+  \CommentTok{#' Temperature decreases linearly with each iteration}
+  \CommentTok{#'}
+  \CommentTok{#' @inheritParams get.temperature}
+  \CommentTok{#' @return Value of temperture for the current iteration (integer)}
+  \CommentTok{#' @examples}
+  \CommentTok{#' temp <- .get.temperature.linear.decrease(25, 100, 7)}
+  \NormalTok{.get.temperature.linear.decrease <-}\StringTok{ }\NormalTok{function (max.temp, max.iter, cur.iter) \{}
+  
+    \CommentTok{# cur.iter is guaranteed to be at most 1 less than max.iter}
+    \CommentTok{# so cur.temp will always be > 0}
+    \NormalTok{cur.temp <-}\StringTok{ }\NormalTok{(max.iter-cur.iter)*(max.temp/max.iter)}
+    \KeywordTok{return} \NormalTok{(cur.temp)}
+  
+  \NormalTok{\} }\CommentTok{# end function - get.temperature.linear.decrease}
+  
+  
+  
+  \CommentTok{#' Get bootstrap sample for a task in the input job}
+  \CommentTok{#'}
+  \CommentTok{#' @param input.size Task size for which samples are required (integer)}
+  \CommentTok{#' @param num.samples Number of samples required  (integer)}
+  \CommentTok{#' @param runtimes Matrix containing size & runtime info for training set sample}
+  \CommentTok{#' @return Matrix containing required number of samples for the given size}
+  \NormalTok{.bootstrap.get.task.sample <-}\StringTok{ }\NormalTok{function (input.size, num.samples, runtimes) \{}
+  
+    \NormalTok{varname <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(}\StringTok{'runtimes.'}\NormalTok{, input.size, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+    \NormalTok{runtimes.cur.size <-}\StringTok{ }\KeywordTok{get}\NormalTok{(varname, }\DataTypeTok{envir=}\NormalTok{data.env)}
+    \NormalTok{num.rows <-}\StringTok{ }\KeywordTok{NROW}\NormalTok{(runtimes.cur.size)}
+  
+    \NormalTok{num.rows >}\StringTok{ }\DecValTok{0} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{'Cannot find any samples for size='}\NormalTok{, input.size,}
+      \StringTok{' in training set. Ensure that training set has samples for this task size'}\NormalTok{)}
+  
+    \NormalTok{idx <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\NormalTok{:num.rows, num.samples, }\DataTypeTok{replace=}\NormalTok{T)}
+    \NormalTok{s <-}\StringTok{ }\NormalTok{runtimes.cur.size[idx,]}
+  
+    \CommentTok{# transpose data frames due to the way they are 'flattened' in unlist}
+    \NormalTok{if (}\KeywordTok{NROW}\NormalTok{(s) >}\StringTok{ }\DecValTok{1}\NormalTok{) s <-}\StringTok{ }\KeywordTok{t}\NormalTok{(s)}
+  
+    \KeywordTok{return} \NormalTok{(s)}
+  \NormalTok{\} }\CommentTok{# end function - .bootstrap.get.task.sample}
+  
+  
+  \CommentTok{#' Get bootstrapped samples for all sizes in the input job}
+  \NormalTok{.bootstrap.get.job.sample <-}\StringTok{ }\NormalTok{function (size.re }
+  \NormalTok{ps.table, runtimes) \{}
+  
+    \CommentTok{# FORMAT of size.reps.table (generated via aggregate())}
+    \CommentTok{# > size.reps.table}
+        \CommentTok{# Group.1 x}
+    \CommentTok{# 1      10 1}
+    \CommentTok{# 2      90 1}
+    \CommentTok{# 3     200 1}
+    \CommentTok{# 4     850 1}
+    \CommentTok{# 5    2100 1}
+  
+    \NormalTok{samples.list <-}\StringTok{ }\KeywordTok{apply}\NormalTok{(size.reps.table, }\DecValTok{1}\NormalTok{, function (x) \{}
+      \KeywordTok{.bootstrap.get.task.sample}\NormalTok{(x[}\DecValTok{1}\NormalTok{], x[}\DecValTok{2}\NormalTok{], runtimes)}
+    \NormalTok{\})}
+    \NormalTok{samples.matrix <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\KeywordTok{unlist}\NormalTok{(samples.list), }\DataTypeTok{ncol=}\DecValTok{2}\NormalTok{, }\DataTypeTok{byrow=}\OtherTok{TRUE}\NormalTok{)}
+  
+    \KeywordTok{return} \NormalTok{(samples.matrix)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .bootstrap.get.job.sample}
+  
+  
+  \NormalTok{.bootstrap.get.job.runtime <-}\StringTok{ }\NormalTok{function (size.reps.table, runtimes) \{}
+  
+    \NormalTok{samples.matrix <-}\StringTok{ }\KeywordTok{.bootstrap.get.job.sample}\NormalTok{(size.reps.table, runtimes)}
+    \NormalTok{s <-}\StringTok{ }\KeywordTok{sum}\NormalTok{(samples.matrix[,}\DecValTok{2}\NormalTok{])}
+    \KeywordTok{return} \NormalTok{(s)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .bootstrap.get.job.runtime}
+  
+  
+  \CommentTok{#' Get distribution of job runtime via bootstrap re-sampling}
+  \CommentTok{#'}
+  \CommentTok{#' @param size.reps.table Data frame with 2 columns; typically obtained as the}
+  \CommentTok{#' output from the aggregate() function.}
+  \CommentTok{#' 1st column is the task size}
+  \CommentTok{#' 2nd column is the number of tasks with this size}
+  \CommentTok{#' @param num.bootstrap.reps Number of bootstrap replicates in distribution}
+  \CommentTok{#' @param runtimes Matrix containing size & runtime info for training set sample}
+  \CommentTok{#' @examples}
+  \CommentTok{#' data(m3xlarge.runtimes.expdist)}
+  \CommentTok{#' setup.trainingset.runtimes('m3xlarge', m3xlarge.runtimes.expdist)}
+  \CommentTok{#' job <- c(1,60,100)}
+  \CommentTok{#' srt <- aggregate(job, by=list(job), length)}
+  \CommentTok{#' dist <- .bootstrap.get.job.runtime.dist(srt, 500, m3xlarge.runtimes.expdist)}
+  \NormalTok{.bootstrap.get.job.runtime.dist <-}
+\StringTok{    }\NormalTok{function (size.reps.table, num.bootstrap.reps, runtimes) \{}
+  
+    \NormalTok{job.runtime.dist <-}\StringTok{ }\KeywordTok{array}\NormalTok{(}\DataTypeTok{dim=}\NormalTok{num.bootstrap.reps)}
+    \NormalTok{for(i in }\DecValTok{1}\NormalTok{:num.bootstrap.reps) \{}
+        \NormalTok{r <-}\StringTok{ }\KeywordTok{.bootstrap.get.job.runtime}\NormalTok{(size.reps.table, runtimes)}
+      \NormalTok{job.runtime.dist[i] <-}\StringTok{ }\NormalTok{r}
+    \NormalTok{\} }\CommentTok{# end for - perform required number of iterations}
+  
+    \KeywordTok{return} \NormalTok{(job.runtime.dist)}
+  
+  \NormalTok{\} }\CommentTok{# end function - .bootstrap.get.job.runtime.dist}
+  
+  
+  
+  \CommentTok{# -----}
+  \CommentTok{# Exported functions}
+  \CommentTok{# -----}
+  
+  
+  \CommentTok{#' Setup runtimes for given instance type}
+  \CommentTok{#'}
+  \CommentTok{#' All instances in a cluster are assumed to be of the same type}
+  \CommentTok{#'}
+  \CommentTok{#' @param instance.type Instance type of cluster (string).}
+  \CommentTok{#' All instances in the cluster are assumed to be of the same type}
+  \CommentTok{#' @param runtimes Matrix of runtimes for the given instance type}
+  \CommentTok{#' Each row in the matrix represents a single training sample and has 2 columns.}
+  \CommentTok{#' The size column is the size of task that was processed.}
+  \CommentTok{#' The runtime_sec column is the time taken to process the task in seconds.}
+  \CommentTok{#' @return The environment in which the varibles were set up}
+  \CommentTok{#' @export}
+  \CommentTok{#' @examples}
+  \CommentTok{#' runtimes <- cbind(rep(c(1,2), each=5), c(rpois(5,5), rpois(5,10)))}
+  \CommentTok{#' setup.trainingset.runtimes('m3xlarge', runtimes)}
+  \NormalTok{setup.trainingset.runtimes <-}\StringTok{ }\NormalTok{function (instance.type, runtimes) \{}
+  
+    \CommentTok{# Validate args}
+    \KeywordTok{.validate.instance.type}\NormalTok{(instance.type)}
+    \KeywordTok{.validate.runtimes}\NormalTok{(runtimes)}
+  
+    \CommentTok{# Save runtimes of individual trials to use in bootstrap sampling}
+    \NormalTok{varname <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(instance.type, }\StringTok{'.runtimes'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+    \CommentTok{# create new var in internal env (data.env)}
+    \KeywordTok{assign}\NormalTok{(varname, runtimes, }\DataTypeTok{envir=}\NormalTok{data.env)}
+  
+  
+    \CommentTok{# save runtime summary}
+    \NormalTok{m <-}\StringTok{ }\KeywordTok{aggregate}\NormalTok{(runtimes[, }\DecValTok{2}\NormalTok{], }\DataTypeTok{by=}\KeywordTok{list}\NormalTok{(runtimes[, }\DecValTok{1}\NormalTok{]), mean)}
+    \NormalTok{v <-}\StringTok{ }\KeywordTok{aggregate}\NormalTok{(runtimes[, }\DecValTok{2}\NormalTok{], }\DataTypeTok{by=}\KeywordTok{list}\NormalTok{(runtimes[, }\DecValTok{1}\NormalTok{]), var)}
+    \NormalTok{mv <-}\StringTok{ }\KeywordTok{cbind}\NormalTok{(m[, }\DecValTok{1}\NormalTok{], m[, }\DecValTok{2}\NormalTok{], v[, }\DecValTok{2}\NormalTok{])}
+    \KeywordTok{colnames}\NormalTok{(mv) <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{'size'}\NormalTok{, }\StringTok{'mean'}\NormalTok{, }\StringTok{'var'}\NormalTok{)}
+  
+    \NormalTok{varname <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(instance.type, }\StringTok{'.runtimes.summary'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+    \CommentTok{# create new var in internal env (data.env)}
+    \KeywordTok{assign}\NormalTok{(varname, mv, }\DataTypeTok{envir=}\NormalTok{data.env)}
+  
+  
+    \CommentTok{# save runtimes for each size in a separate var}
+    \NormalTok{uniq.sizes <-}\StringTok{ }\KeywordTok{unique}\NormalTok{(runtimes[,}\DecValTok{1}\NormalTok{])}
+    \NormalTok{for (s in uniq.sizes) \{}
+      \NormalTok{varname <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(}\StringTok{'runtimes.'}\NormalTok{, s, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+      \NormalTok{ss <-}\StringTok{ }\KeywordTok{subset}\NormalTok{(runtimes, runtimes[,}\DecValTok{1}\NormalTok{]==s)}
+      \KeywordTok{assign}\NormalTok{(varname, ss, }\DataTypeTok{envir=}\NormalTok{data.env)}
+    \NormalTok{\} }\CommentTok{# end for - loop over all sizes}
+  
+    \KeywordTok{return}\NormalTok{(data.env)}
+  
+  \NormalTok{\} }\CommentTok{# end function - setup.trainingset.runtimes}
+  
+  
+  
+  \CommentTok{#' Get initial schedule of jobs to instances in a cluster}
+  \CommentTok{#'}
+  \CommentTok{#' @param cluster.size Number of instances in the cluster (+ve integer)}
+  \CommentTok{#' @param task.sizes Array of task sizes (+ve reals)}
+  \CommentTok{#' @param runtimes.summary Numeric matrix containing mean and variance of}
+  \CommentTok{#' runtimes for each size. Must be supplied when method='leptf'}
+  \CommentTok{#' @param method Method to use to assign tasks to instances.}
+  \CommentTok{#' Must be one of ('random', 'leptf').}
+  \CommentTok{#' @return List containing a mapping of tasks to instances in cluster.}
+  \CommentTok{#' The list index represents the id of an instance in the cluster while}
+  \CommentTok{#' the associated list member represents the task assigned to that instance}
+  \CommentTok{#' @export}
+  \CommentTok{#' @examples}
+  \CommentTok{#' a <- get.initial.schedule(3, 1:30)}
+  \CommentTok{#' rs <- matrix(nrow=2, ncol=3)}
+  \CommentTok{#' rs[1,1] <- 10; rs[1,2] <- 23.5; rs[1,3] <- 2.5}
+  \CommentTok{#' rs[2,1] <- 20; rs[2,2] <- 33.5; rs[2,3] <- 3.5}
+  \CommentTok{#' a <- get.initial.schedule(3, c(rep(10, 3), rep(20, 3)), rs, method='leptf')}
+  \NormalTok{get.initial.schedule <-}
+\StringTok{    }\NormalTok{function (cluster.size, task.sizes, runtimes.summary, }\DataTypeTok{method=}\StringTok{'random'}\NormalTok{) \{}
+  
+    \CommentTok{# Validate args}
+    \KeywordTok{.check.if.positive.integer}\NormalTok{(cluster.size)}
+    \KeywordTok{.check.if.positive.real}\NormalTok{(task.sizes)}
+  
+    \NormalTok{if (method==}\StringTok{'random'}\NormalTok{) \{}
+      \NormalTok{schedule <-}\StringTok{ }\KeywordTok{.get.initial.schedule.random}\NormalTok{(cluster.size, task.sizes)}
+    \NormalTok{\} else if (method==}\StringTok{'leptf'}\NormalTok{) \{}
+      \KeywordTok{.validate.runtimes.summary}\NormalTok{(runtimes.summary)}
+      \NormalTok{schedule <-}\StringTok{ }\KeywordTok{.get.initial.schedule.leptf}\NormalTok{(}
+        \NormalTok{cluster.size, task.sizes, runtimes.summary}
+      \NormalTok{)}
+    \NormalTok{\} else \{}
+      \KeywordTok{stop}\NormalTok{(}\StringTok{'Invalid argument: '}\NormalTok{, method, }\StringTok{' is not a valid value for method'}\NormalTok{)}
+    \NormalTok{\} }\CommentTok{# end if - method=random?}
+  
+    \KeywordTok{return} \NormalTok{(schedule)}
+  
+  \NormalTok{\} }\CommentTok{# end function - get.initial.schedule}
+  
+  
+  
+  \CommentTok{#' Generate a neighbor to an schedule}
+  \CommentTok{#'}
+  \CommentTok{#' The input schedule is modified in one of several different ways, including}
+  \CommentTok{#' \textbackslash{}itemize\{}
+  \CommentTok{#'  \textbackslash{}item Move a task from 1 instance to another}
+  \CommentTok{#'  \textbackslash{}item Exchange a task with another instance}
+  \CommentTok{#'  \textbackslash{}item Move 2 tasks from 1 instance to another}
+  \CommentTok{#'  \textbackslash{}item Exchange 2 tasks with another instance}
+  \CommentTok{#'  \textbackslash{}item Move 2 tasks from an instance to 2 other instance}
+  \CommentTok{#'  \textbackslash{}item Exchange 2 tasks with 2 other instances}
+  \CommentTok{#'  \textbackslash{}item and so on...}
+  \CommentTok{#' \}}
+  \CommentTok{#' Only the first 2 methods are currently implemented with an equal probability}
+  \CommentTok{#' of selecting either method.}
+  \CommentTok{#'}
+  \CommentTok{#' @param schedule A list representing a mapping of tasks to instances in a}
+  \CommentTok{#' cluster}
+  \CommentTok{#' @return A list representing the modified schedule of tasks to instances in}
+  \CommentTok{#' the cluster}
+  \CommentTok{#' @export}
+  \CommentTok{#' @examples}
+  \CommentTok{#' schedule <- get.initial.schedule(3, 1:30)}
+  \CommentTok{#' proposed.schedule <- get.neighbor(schedule)}
+  \NormalTok{get.neighbor <-}\StringTok{ }\NormalTok{function (schedule) \{}
+  
+    \CommentTok{# Validate args}
+    \KeywordTok{.validate.schedule}\NormalTok{(schedule)}
+  
+    \CommentTok{# Cannot get neighbors if cluster has < 2 instances}
+    \NormalTok{num.instances.in.schedule <-}\StringTok{ }\KeywordTok{length}\NormalTok{(schedule)}
+    \NormalTok{if (num.instances.in.schedule <}\StringTok{ }\DecValTok{2}\NormalTok{) \{ }\KeywordTok{return} \NormalTok{(schedule) \}}
+  
+  
+    \NormalTok{ex <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\KeywordTok{c}\NormalTok{(}\OtherTok{TRUE}\NormalTok{, }\OtherTok{FALSE}\NormalTok{), }\DecValTok{1}\NormalTok{)}
+  
+    \NormalTok{num.tasks.in.instances <-}\StringTok{ }\KeywordTok{sapply}\NormalTok{(schedule, length)}
+    \NormalTok{num.tasks.in.instances <-}\StringTok{ }\KeywordTok{round}\NormalTok{(num.tasks.in.instances/}\DecValTok{3}\NormalTok{)}
+    \NormalTok{num.tasks <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\KeywordTok{max}\NormalTok{(num.tasks.in.instances), }\DecValTok{1}\NormalTok{)}
+  
+    \NormalTok{if (ex) \{ }\KeywordTok{cat}\NormalTok{(}\StringTok{'Exchange'}\NormalTok{, num.tasks, }\StringTok{'tasks }\CharTok{\textbackslash{}n\textbackslash{}n}\StringTok{'}\NormalTok{) \}}
+    \NormalTok{else \{ }\KeywordTok{cat}\NormalTok{(}\StringTok{'Move'}\NormalTok{, num.tasks, }\StringTok{'tasks }\CharTok{\textbackslash{}n\textbackslash{}n}\StringTok{'}\NormalTok{) \}}
+  
+    \NormalTok{neighbor <-}\StringTok{ }\KeywordTok{move.tasks}\NormalTok{(schedule, num.tasks, }\DataTypeTok{exchange=}\NormalTok{ex)}
+  
+    \KeywordTok{return} \NormalTok{(neighbor)}
+  
+  \NormalTok{\} }\CommentTok{# end function - get.neighbor}
+  
+  
+  
+  \CommentTok{#' Generate neighbor by moving 1 task}
+  \CommentTok{#'}
+  \CommentTok{#' Randomly select 2 instances in the cluster. Randomly select a task from one}
+  \CommentTok{#' of the instances and move it to the other instance. Simple random sampling}
+  \CommentTok{#' without replacement is used in both sampling stages.}
+  \CommentTok{#'}
+  \CommentTok{#' @param schedule A list representing the schedule for which a neighbor is}
+  \CommentTok{#' desired}
+  \CommentTok{#' @param num.tasks Integer representing the number of tasks to be moved from 1}
+  \CommentTok{#' instance to another}
+  \CommentTok{#' @param exchange Exchange tasks between instances instead of moving them}
+  \CommentTok{#' @return A list representing the neighboring schedule}
+  \CommentTok{#' @export}
+  \CommentTok{#' @examples}
+  \CommentTok{#' schedule <- get.initial.schedule(3, 1:30)}
+  \CommentTok{#' neighbor <- move.tasks(schedule, 1)}
+  \CommentTok{#' neighbor <- move.tasks(schedule, 1, exchange=TRUE)}
+  \NormalTok{move.tasks <-}\StringTok{ }\NormalTok{function (schedule, num.tasks, }\DataTypeTok{exchange=}\OtherTok{FALSE}\NormalTok{) \{}
+  
+    \CommentTok{# Validate args}
+    \KeywordTok{.validate.schedule}\NormalTok{(schedule)}
+    \KeywordTok{.check.if.positive.integer}\NormalTok{(num.tasks)}
+  
+    \CommentTok{# Need at least 2 instances to move/exchange tasks}
+    \CommentTok{#FIXME: this check is also present in get.neighbor. Needs to be removed}
+    \CommentTok{# after making this function internal so it is only called via get.neighbor()}
+    \NormalTok{num.instances.in.schedule <-}\StringTok{ }\KeywordTok{length}\NormalTok{(schedule)}
+    \NormalTok{if (num.instances.in.schedule <}\StringTok{ }\DecValTok{2}\NormalTok{) \{ }\KeywordTok{return} \NormalTok{(schedule) \}}
+  
+  
+    \CommentTok{# Check if we have sufficient # tasks in the schedule (across all instances)}
+    \NormalTok{if (exchange) \{}
+      \CommentTok{# Check if we have enough tasks to exchange}
+      \NormalTok{valid <-}\StringTok{ }\KeywordTok{.validate.num.tasks.in.schedule}\NormalTok{(schedule, }\DecValTok{2}\NormalTok{*num.tasks)}
+  
+      \NormalTok{if (!}\StringTok{ }\NormalTok{valid) \{}
+        \CommentTok{# If not, check if we have enough tasks to move}
+        \KeywordTok{cat}\NormalTok{(}\StringTok{'WARN: Cannot exchange'}\NormalTok{, num.tasks, }\StringTok{' tasks between 2 instances.}
+\StringTok{          Moving'}\NormalTok{, num.tasks, }\StringTok{'tasks instead. }\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+        \NormalTok{exchange <-}\StringTok{ }\OtherTok{FALSE}
+        \NormalTok{valid <-}\StringTok{ }\KeywordTok{.validate.num.tasks.in.schedule}\NormalTok{(schedule, num.tasks)}
+        \NormalTok{if (!}\StringTok{ }\NormalTok{valid) \{}
+          \CommentTok{# If not, fail}
+          \KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument: Insufficient number of task to move"}\NormalTok{)}
+        \NormalTok{\} }\CommentTok{# end if - insufficient # tasks to move}
+      \NormalTok{\} }\CommentTok{# end if - have enough tasks to exchange?}
+  
+    \NormalTok{\} else \{}
+      \CommentTok{# Check if we have enough tasks to move}
+      \NormalTok{valid <-}\StringTok{ }\KeywordTok{.validate.num.tasks.in.schedule}\NormalTok{(schedule, num.tasks)}
+      \NormalTok{if (!}\StringTok{ }\NormalTok{valid) \{}
+        \CommentTok{# If not, fail}
+        \KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument: Insufficient number of task to move"}\NormalTok{)}
+      \NormalTok{\} }\CommentTok{# end if - insufficient # tasks to move}
+  
+    \NormalTok{\} }\CommentTok{# end if - exchange tasks?}
+  
+  
+    \CommentTok{# number of instances to use depends on whether we are moving tasks}
+    \CommentTok{# or exchanging tasks}
+    \CommentTok{# - exchange requires 2 instances; move requires 1 instance}
+    \NormalTok{num.instances.to.use <-}\StringTok{ }\KeywordTok{.get.num.instances}\NormalTok{(exchange)}
+  
+  
+    \CommentTok{# Get all instances with at least num.tasks tasks}
+    \NormalTok{all.admissable.instances <-}
+\StringTok{      }\KeywordTok{.get.admissable.instances}\NormalTok{(schedule, num.tasks, num.instances.to.use)}
+  
+    \CommentTok{# Can fail to get sufficient # admissable instances when:}
+    \CommentTok{# exchange & # instances < 2}
+    \CommentTok{# !exchange and # instances < 1 (due to insufficient # tasks to move in all}
+    \CommentTok{# instances)}
+  
+    \NormalTok{if (  (exchange &&}\StringTok{ }\NormalTok{(}\KeywordTok{length}\NormalTok{(all.admissable.instances) <}\StringTok{ }\DecValTok{2}\NormalTok{)) ||}
+\StringTok{          }\NormalTok{(}\KeywordTok{length}\NormalTok{(all.admissable.instances) <}\StringTok{ }\DecValTok{1}\NormalTok{) ) \{}
+      \CommentTok{# Insuffucient # admissable instances,}
+      \CommentTok{# so try moving 1 task between instances}
+      \KeywordTok{cat}\NormalTok{(}\StringTok{'WARN: Insufficient # instances to move/exchange tasks.}
+\StringTok{        Moving 1 task instead. }\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+      \NormalTok{exchange <-}\StringTok{ }\NormalTok{F}
+      \NormalTok{num.instances.to.use <-}\StringTok{ }\KeywordTok{.get.num.instances}\NormalTok{(exchange) }\CommentTok{# use 1 instance}
+      \NormalTok{num.tasks <-}\StringTok{ }\DecValTok{1}
+      \NormalTok{all.admissable.instances <-}
+\StringTok{        }\KeywordTok{.get.admissable.instances}\NormalTok{(schedule, num.tasks, num.instances.to.use)}
+  
+      \NormalTok{if(}\KeywordTok{length}\NormalTok{(all.admissable.instances) <}\StringTok{ }\DecValTok{1}\NormalTok{) \{}
+        \KeywordTok{stop}\NormalTok{(}\StringTok{"Error: Cannot find a single instance with at least 1 task!"}\NormalTok{)}
+      \NormalTok{\} }\CommentTok{# end if - found at least 1 instance with 1 task?}
+  
+    \NormalTok{\} }\CommentTok{# end if - sufficient # instances found?}
+  
+    \NormalTok{idx.admissable.instances.sample <-}
+\StringTok{      }\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\NormalTok{:}\KeywordTok{length}\NormalTok{(all.admissable.instances), num.instances.to.use)}
+    \NormalTok{admissable.instances.sample <-}
+\StringTok{      }\NormalTok{all.admissable.instances[idx.admissable.instances.sample]}
+  
+    \CommentTok{# Remove task(s) from donor instance(s)}
+    \NormalTok{tasks.mat <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\DataTypeTok{nrow=}\NormalTok{num.instances.to.use, }\DataTypeTok{ncol=}\NormalTok{num.tasks)}
+    \NormalTok{for (i in }\DecValTok{1}\NormalTok{:num.instances.to.use) \{}
+  
+      \NormalTok{inst <-}\StringTok{ }\NormalTok{admissable.instances.sample[i]}
+      \NormalTok{num.tasks.in.instance <-}\StringTok{ }\KeywordTok{length}\NormalTok{(schedule[[inst]])}
+      \NormalTok{idx.tasks <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\NormalTok{:num.tasks.in.instance, num.tasks)}
+      \NormalTok{tasks <-}\StringTok{ }\NormalTok{schedule[[inst]][idx.tasks]}
+  
+      \NormalTok{schedule[[inst]] =}\StringTok{ }\NormalTok{schedule[[inst]][-idx.tasks]}
+      \NormalTok{num.remaining.tasks.in.instance <-}\StringTok{ }\KeywordTok{length}\NormalTok{(schedule[[inst]])}
+      \NormalTok{if (num.remaining.tasks.in.instance ==}\StringTok{ }\DecValTok{0}\NormalTok{) schedule[inst] <-}\StringTok{ }\KeywordTok{list}\NormalTok{(}\OtherTok{NULL}\NormalTok{)}
+  
+      \NormalTok{tasks.mat[i,] <-}\StringTok{ }\NormalTok{tasks}
+    \NormalTok{\} }\CommentTok{# end for - loop over all instances}
+  
+  
+    \CommentTok{# TODO: need a more general way to do this}
+    \NormalTok{if (exchange) \{}
+      \NormalTok{instance1 <-}\StringTok{ }\NormalTok{admissable.instances.sample[}\DecValTok{1}\NormalTok{]}
+      \NormalTok{schedule[[instance1]] <-}\StringTok{ }\KeywordTok{c}\NormalTok{(schedule[[instance1]], tasks.mat[}\DecValTok{2}\NormalTok{,])}
+  
+      \NormalTok{instance2 <-}\StringTok{ }\NormalTok{admissable.instances.sample[}\DecValTok{2}\NormalTok{]}
+      \NormalTok{schedule[[instance2]] <-}\StringTok{ }\KeywordTok{c}\NormalTok{(schedule[[instance2]], tasks.mat[}\DecValTok{1}\NormalTok{,])}
+  
+    \NormalTok{\} else \{}
+      \CommentTok{# Get acceptor instance}
+      \NormalTok{idx.remaining.instances <-}
+\StringTok{        }\NormalTok{(}\DecValTok{1}\NormalTok{:}\KeywordTok{length}\NormalTok{(schedule))[-admissable.instances.sample]}
+      \NormalTok{num.remaining.instances <-}\StringTok{ }\KeywordTok{length}\NormalTok{(idx.remaining.instances)}
+      \NormalTok{if (num.remaining.instances ==}\StringTok{ }\DecValTok{1}\NormalTok{) \{ instance2 <-}\StringTok{ }\NormalTok{idx.remaining.instances \}}
+      \NormalTok{else \{ instance2 <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\KeywordTok{c}\NormalTok{(idx.remaining.instances), }\DecValTok{1}\NormalTok{) \}}
+  
+      \CommentTok{# Move the task to this instance}
+      \NormalTok{schedule[[instance2]] <-}\StringTok{ }\KeywordTok{c}\NormalTok{(schedule[[instance2]], tasks.mat[}\DecValTok{1}\NormalTok{,])}
+  
+    \NormalTok{\} }\CommentTok{# end if - move only?}
+  
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'score'}\NormalTok{) <-}\StringTok{ }\OtherTok{NULL}
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'runtime95pct'}\NormalTok{) <-}\StringTok{ }\OtherTok{NULL}
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'runtime99pct'}\NormalTok{) <-}\StringTok{ }\OtherTok{NULL}
+  
+    \KeywordTok{return} \NormalTok{(schedule)}
+  
+  \NormalTok{\} }\CommentTok{# end sub - move.tasks}
+  
+  
+  
+  \CommentTok{#' Compare 2 schedules based on their score}
+  \CommentTok{#'}
+  \CommentTok{#' Scores are calculated for both schedules. If the score of the proposed}
+  \CommentTok{#' schedule is lower than the score for the current schedule, the proposed}
+  \CommentTok{#' schedule and score are returned. If the score of the proposed schedule is}
+  \CommentTok{#' greater than or equal to the current schedule, the a function of the}
+  \CommentTok{#' current temperature and the 2 scores is used to determine which schedule}
+  \CommentTok{#' to return.}
+  \CommentTok{#'}
+  \CommentTok{#' @param cur.schedule Current assigment with score attribute (list)}
+  \CommentTok{#' @param proposed.schedule Proposed schedule with no score (list)}
+  \CommentTok{#' @param runtimes Matrix of runtimes for the given instance type. Each row in}
+  \CommentTok{#' the matrix represents a single training sample and has 2 columns. The size}
+  \CommentTok{#' column is the size of task that was processed. The runtime_sec column is the}
+  \CommentTok{#' time taken to process the task in seconds.}
+  \CommentTok{#' @param runtimes.summary Numeric matrix containing mean and variance of}
+  \CommentTok{#' runtimes for each size}
+  \CommentTok{#' @param deadline Time by which job must be complete (float). Same time units}
+  \CommentTok{#' as runtimes}
+  \CommentTok{#' @param max.temp Max temperature to use in the simulated annealing process}
+  \CommentTok{#' '(integer)}
+  \CommentTok{#' @param max.iter Max # iterations to use to find the optimal schedule via}
+  \CommentTok{#' simulated annealing (integer)}
+  \CommentTok{#' @param cur.iter Value of current iteration (integer)}
+  \CommentTok{#' @return A list containing the accepted schedule and score}
+  \CommentTok{#' @export}
+  \CommentTok{# @examples}
+  \CommentTok{# data('m3xlarge.runtimes.expdist')}
+  \CommentTok{# setup.trainingset.runtimes('m3xlarge', m3xlarge.runtimes.expdist)}
+  \CommentTok{# r <- get('m3xlarge.runtimes', envir=data.env)}
+  \CommentTok{# rs <- get('m3xlarge.runtimes.summary', envir=data.env)}
+  \CommentTok{# assign('runtimes.1', r, envir='data.env')}
+  \CommentTok{# c.a <- get.initial.schedule(2, c(1,1,1,1))}
+  \CommentTok{# c.a <- get.score(c.a, r, rs, 120)}
+  \CommentTok{# p.a <- get.neighbor(c.a)}
+  \CommentTok{# a <- compare.schedules(c.a, p.a, r, rs, 120, 25, 100, 7)}
+  \NormalTok{compare.schedules <-}\StringTok{ }\NormalTok{function (cur.schedule, proposed.schedule, runtimes,}
+      \NormalTok{runtimes.summary, deadline, max.temp, max.iter, cur.iter) \{}
+  
+    \CommentTok{# Validate args}
+    \KeywordTok{.validate.schedule}\NormalTok{(cur.schedule)}
+    \KeywordTok{.validate.schedule.attributes}\NormalTok{(cur.schedule)}
+    \KeywordTok{.check.if.nonnegative.real}\NormalTok{(}\KeywordTok{attr}\NormalTok{(cur.schedule, }\StringTok{'score'}\NormalTok{))}
+    \KeywordTok{.validate.schedule}\NormalTok{(proposed.schedule)}
+  
+    \KeywordTok{.validate.runtimes}\NormalTok{(runtimes)}
+    \KeywordTok{.validate.runtimes.summary}\NormalTok{(runtimes.summary)}
+  
+    \KeywordTok{.check.if.positive.real}\NormalTok{(deadline)}
+    \KeywordTok{length}\NormalTok{(deadline) ==}\StringTok{ }\DecValTok{1} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument length:}
+\StringTok{      deadline must be a single +ve real number"}\NormalTok{)}
+  
+    \KeywordTok{.check.if.positive.real}\NormalTok{(max.temp)}
+    \KeywordTok{length}\NormalTok{(max.temp) ==}\StringTok{ }\DecValTok{1} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument length:}
+\StringTok{      max.temp must be a single +ve real number"}\NormalTok{)}
+  
+    \KeywordTok{.check.if.positive.integer}\NormalTok{(max.iter)}
+  
+    \KeywordTok{.check.if.nonnegative.integer}\NormalTok{(cur.iter)}
+    \NormalTok{if (cur.iter >=}\StringTok{ }\NormalTok{max.iter) \{ }\KeywordTok{stop}\NormalTok{(}\StringTok{'Invalid argument:}
+\StringTok{      cur.iter '}\NormalTok{, cur.iter, }\StringTok{' is >= max.iter '}\NormalTok{, max.iter) \}}
+  
+    \NormalTok{proposed.schedule <-}
+\StringTok{      }\KeywordTok{get.score}\NormalTok{(proposed.schedule, runtimes, runtimes.summary, deadline)}
+  
+    \KeywordTok{cat}\NormalTok{(}\StringTok{'CURRENT.schedule: }\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+    \KeywordTok{print}\NormalTok{(cur.schedule)}
+    \KeywordTok{cat}\NormalTok{(}\StringTok{'}\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+  
+    \KeywordTok{cat}\NormalTok{(}\StringTok{'PROPOSED.schedule }\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+    \KeywordTok{print}\NormalTok{(proposed.schedule)}
+    \KeywordTok{cat}\NormalTok{(}\StringTok{'}\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+  
+    \CommentTok{# reject all schedules that are not feasible}
+    \NormalTok{if (}\KeywordTok{attr}\NormalTok{(proposed.schedule, }\StringTok{'score'}\NormalTok{) <}\StringTok{ }\FloatTok{0.95}\NormalTok{) \{}
+      \KeywordTok{return}\NormalTok{(cur.schedule)}
+    \NormalTok{\}}
+  
+    \NormalTok{if (}\KeywordTok{attr}\NormalTok{(proposed.schedule, }\StringTok{'processing.cost'}\NormalTok{) <=}\StringTok{ }\KeywordTok{attr}\NormalTok{(cur.schedule, }\StringTok{'processing.cost'}\NormalTok{)) \{}
+      \KeywordTok{cat}\NormalTok{(}\StringTok{'PROPOSED.processing.cost <= current.processing.cost. Returning PROPOSED }\CharTok{\textbackslash{}n\textbackslash{}n}\StringTok{'}\NormalTok{)}
+      \NormalTok{result <-}\StringTok{ }\NormalTok{proposed.schedule}
+  
+    \NormalTok{\} else \{}
+      \KeywordTok{cat}\NormalTok{(}\StringTok{'proposed.processing.cost is higher }\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+        \NormalTok{temp <-}\StringTok{ }\KeywordTok{get.temperature}\NormalTok{(max.temp, max.iter, cur.iter)}
+        \NormalTok{lhs <-}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{exp}\NormalTok{((}\KeywordTok{attr}\NormalTok{(proposed.schedule, }\StringTok{'processing.cost'}\NormalTok{) -}
+\StringTok{        }\KeywordTok{attr}\NormalTok{(cur.schedule, }\StringTok{'processing.cost'}\NormalTok{))/temp), }\DecValTok{2}\NormalTok{)}
+        \NormalTok{rhs <-}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{runif} \NormalTok{(}\DecValTok{1}\NormalTok{, }\DataTypeTok{min=}\DecValTok{0}\NormalTok{, }\DataTypeTok{max=}\DecValTok{1}\NormalTok{), }\DecValTok{2}\NormalTok{)}
+      \KeywordTok{cat}\NormalTok{(}\StringTok{'temp='}\NormalTok{,temp, }\StringTok{' lhs='}\NormalTok{,lhs, }\StringTok{' rhs='}\NormalTok{,rhs, }\StringTok{'}\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+  
+        \NormalTok{if (lhs >}\StringTok{ }\NormalTok{rhs) \{}
+        \KeywordTok{cat}\NormalTok{(}\StringTok{'lhs > rhs; returning PROPOSED }\CharTok{\textbackslash{}n\textbackslash{}n}\StringTok{'}\NormalTok{)}
+        \NormalTok{result <-}\StringTok{ }\NormalTok{proposed.schedule}
+        \NormalTok{\} else \{}
+        \KeywordTok{cat}\NormalTok{(}\StringTok{'lhs <= rhs; returning CURRENT }\CharTok{\textbackslash{}n\textbackslash{}n}\StringTok{'}\NormalTok{)}
+        \NormalTok{result <-}\StringTok{ }\NormalTok{cur.schedule}
+        \NormalTok{\} }\CommentTok{# end if - lhs > rhs?}
+  
+    \NormalTok{\} }\CommentTok{# end if - proposed.score >= cur.score?}
+  
+    \KeywordTok{return} \NormalTok{(result)}
+  
+  \NormalTok{\} }\CommentTok{# end function - compare.schedules}
+  
+  
+  
+  \CommentTok{#' Get score for input schedule}
+  \CommentTok{#'}
+  \CommentTok{#' @param schedule The schedule which needs to be scored (list)}
+  \CommentTok{#' @param runtimes Matrix of runtimes for the given instance type.}
+  \CommentTok{#' Each row in the matrix represents a single training sample and has 2 columns.}
+  \CommentTok{#' The size column is the size of task that was processed.}
+  \CommentTok{#' The runtime_sec column is the time taken to process the task in seconds.}
+  \CommentTok{#' Used only when getting di }
+  \NormalTok{stribution of job runtimes by bootstrap resampling.}
+  \CommentTok{#' @param runtimes.summary Numeric matrix containing mean and variance of}
+  \CommentTok{#' runtimes for each size}
+  \CommentTok{#' Used only when getting distribution of job runtimes by Normal approximation}
+  \CommentTok{#' via Central Limit Theorem.}
+  \CommentTok{#' @param deadline Time by which job must complete}
+  \CommentTok{#' '(float; same units as runtimes)}
+  \CommentTok{#' @param debug Return more info when running in debug mode}
+  \CommentTok{#' @return The input schedule with a value for the score attribute. Score is}
+  \CommentTok{#' the probability of the schedule completing the job by the deadline based}
+  \CommentTok{#' on the training set runtimes of the tasks in the job (float).}
+  \CommentTok{#' @export}
+  \CommentTok{# @examples}
+  \CommentTok{# data('m3xlarge.runtimes.expdist')}
+  \CommentTok{# setup.trainingset.runtimes('m3xlarge', m3xlarge.runtimes.expdist)}
+  \CommentTok{# schedule <- get.initial.schedule(2, c(1,1,1,1))}
+  \CommentTok{# runtimes <- get('m3xlarge.runtimes', envir=data.env)}
+  \CommentTok{# runtimes.summary <- get('m3xlarge.runtimes.summary', envir=data.env)}
+  \CommentTok{# schedule <- get.score(schedule, runtimes, runtimes.summary, 60)}
+  \NormalTok{get.score <-}\StringTok{ }\NormalTok{function (schedule, runtimes, runtimes.summary, deadline, }\DataTypeTok{debug=}\OtherTok{FALSE}\NormalTok{) \{}
+  
+    \CommentTok{# Validate args}
+    \KeywordTok{.validate.schedule}\NormalTok{(schedule)}
+  
+    \KeywordTok{.validate.runtimes}\NormalTok{(runtimes)}
+    \KeywordTok{.validate.runtimes.summary}\NormalTok{(runtimes.summary)}
+  
+    \KeywordTok{.check.if.positive.real}\NormalTok{(deadline)}
+    \KeywordTok{length}\NormalTok{(deadline) ==}\StringTok{ }\DecValTok{1} \NormalTok{||}\StringTok{ }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument length: deadline must be a}
+\StringTok{      single +ve real number"}\NormalTok{)}
+  
+    \NormalTok{num.instances <-}\StringTok{ }\KeywordTok{length}\NormalTok{(schedule)}
+    \NormalTok{scores <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\DataTypeTok{nrow=}\NormalTok{num.instances, }\DataTypeTok{ncol=}\DecValTok{3}\NormalTok{)}
+    \NormalTok{processing.cost <-}\StringTok{ }\KeywordTok{array}\NormalTok{(}\DataTypeTok{dim=}\NormalTok{num.instances)}
+  
+    \NormalTok{for (i in }\DecValTok{1}\NormalTok{:num.instances) \{}
+  
+      \NormalTok{tasks <-}\StringTok{ }\NormalTok{schedule[[i]]}
+      \NormalTok{num.tasks <-}\StringTok{ }\KeywordTok{length}\NormalTok{(tasks)}
+  
+      \NormalTok{if (num.tasks ==}\StringTok{ }\DecValTok{0}\NormalTok{) \{}
+        \NormalTok{scores[i] <-}\StringTok{ }\DecValTok{1}
+        \NormalTok{next;}
+      \NormalTok{\} }\CommentTok{# end if - any tasks on instance?}
+  
+      \NormalTok{g <-}\StringTok{ }\KeywordTok{aggregate}\NormalTok{(tasks, }\DataTypeTok{by=}\KeywordTok{list}\NormalTok{(tasks), }\DataTypeTok{FUN=}\NormalTok{length)}
+  
+      \NormalTok{if (num.tasks >}\StringTok{ }\NormalTok{bootstrap.threshold) \{}
+        \CommentTok{# cat('Using Normal approx. to runtime dist. \textbackslash{}n')}
+        \NormalTok{means <-}\StringTok{ }\KeywordTok{apply}\NormalTok{(g, }\DecValTok{1}\NormalTok{,}
+                        \NormalTok{function (x) \{}
+                  \NormalTok{runtimes.summary[}\KeywordTok{which}\NormalTok{(runtimes.summary[,}\DecValTok{1}\NormalTok{] ==}\StringTok{ }\NormalTok{x[}\DecValTok{1}\NormalTok{]), }\DecValTok{2}\NormalTok{] *}\StringTok{ }\NormalTok{x[}\DecValTok{2}\NormalTok{]}
+              \NormalTok{\}}
+            \NormalTok{)}
+  
+            \NormalTok{vars <-}\StringTok{ }\KeywordTok{apply}\NormalTok{(g, }\DecValTok{1}\NormalTok{,}
+                        \NormalTok{function (x) \{}
+                \NormalTok{runtimes.summary[}\KeywordTok{which}\NormalTok{(runtimes.summary[,}\DecValTok{1}\NormalTok{] ==}\StringTok{ }\NormalTok{x[}\DecValTok{1}\NormalTok{]), }\DecValTok{3}\NormalTok{] *}\StringTok{ }\NormalTok{x[}\DecValTok{2}\NormalTok{]}
+              \NormalTok{\}}
+            \NormalTok{)}
+  
+            \NormalTok{job.mean <-}\StringTok{ }\KeywordTok{sum}\NormalTok{(means)}
+            \NormalTok{job.sd <-}\StringTok{ }\KeywordTok{sqrt}\NormalTok{(}\KeywordTok{sum}\NormalTok{(vars))}
+  
+        \CommentTok{# score for this instance = Prob(tasks on this instance}
+        \CommentTok{# completing by deadline)}
+        \NormalTok{scores[i,}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{pnorm}\NormalTok{(deadline, }\DataTypeTok{mean=}\NormalTok{job.mean, }\DataTypeTok{sd=}\NormalTok{job.sd), }\DecValTok{2}\NormalTok{)}
+        \NormalTok{scores[i,}\DecValTok{2}\NormalTok{] <-}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{qnorm}\NormalTok{(}\FloatTok{0.95}\NormalTok{, }\DataTypeTok{mean=}\NormalTok{job.mean, }\DataTypeTok{sd=}\NormalTok{job.sd), }\DecValTok{2}\NormalTok{)}
+        \NormalTok{scores[i,}\DecValTok{3}\NormalTok{] <-}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{qnorm}\NormalTok{(}\FloatTok{0.99}\NormalTok{, }\DataTypeTok{mean=}\NormalTok{job.mean, }\DataTypeTok{sd=}\NormalTok{job.sd), }\DecValTok{2}\NormalTok{)}
+  
+        \NormalTok{processing.cost[i] <-}\StringTok{ }\NormalTok{scores[i,}\DecValTok{2}\NormalTok{] *}\StringTok{ }\NormalTok{instance.costs[}\DecValTok{1}\NormalTok{]}
+  
+      \NormalTok{\} else \{}
+        \CommentTok{# cat('Using boostrap approx. to runtime dist. \textbackslash{}n')}
+        \NormalTok{bootstrap.dist <-}
+\StringTok{          }\KeywordTok{.bootstrap.get.job.runtime.dist}\NormalTok{(g, num.bootstrap.reps, runtimes)}
+  
+        \CommentTok{# Prob. of this instance completing by deadline}
+        \NormalTok{ecdf.fn <-}\StringTok{ }\KeywordTok{ecdf}\NormalTok{(bootstrap.dist)}
+  
+        \NormalTok{scores[i,}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{ecdf.fn}\NormalTok{(deadline), }\DecValTok{2}\NormalTok{)}
+        \NormalTok{scores[i,}\DecValTok{2}\NormalTok{] <-}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{quantile}\NormalTok{(bootstrap.dist, }\FloatTok{0.95}\NormalTok{), }\DecValTok{2}\NormalTok{)}
+        \NormalTok{scores[i,}\DecValTok{3}\NormalTok{] <-}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{quantile}\NormalTok{(bootstrap.dist, }\FloatTok{0.99}\NormalTok{), }\DecValTok{2}\NormalTok{)}
+  
+        \NormalTok{processing.cost[i] <-}\StringTok{ }\NormalTok{scores[i,}\DecValTok{2}\NormalTok{] *}\StringTok{ }\NormalTok{instance.costs[}\DecValTok{1}\NormalTok{]}
+  
+      \NormalTok{\} }\CommentTok{# end if - more than bootstrap.threshold tasks?}
+  
+    \NormalTok{\} }\CommentTok{# end for - loop over all instances in schedule}
+  
+    \CommentTok{# Return score of instance with least prob of completing by deadline}
+    \CommentTok{# This determines the feasibility of the schedule}
+    \NormalTok{min.idx <-}\StringTok{ }\KeywordTok{which.min}\NormalTok{(scores[,}\DecValTok{1}\NormalTok{])}
+  
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'score'}\NormalTok{) <-}\StringTok{ }\NormalTok{scores[min.idx, }\DecValTok{1}\NormalTok{]}
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'processing.cost'}\NormalTok{) <-}\StringTok{ }\KeywordTok{sum}\NormalTok{(processing.cost, }\DataTypeTok{na.rm=}\OtherTok{TRUE}\NormalTok{)}
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'deadline'}\NormalTok{) <-}\StringTok{ }\NormalTok{deadline}
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'runtime95pct'}\NormalTok{) <-}\StringTok{ }\NormalTok{scores[min.idx, }\DecValTok{2}\NormalTok{]}
+    \KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'runtime99pct'}\NormalTok{) <-}\StringTok{ }\NormalTok{scores[min.idx, }\DecValTok{3}\NormalTok{]}
+    \NormalTok{if(debug &&}\StringTok{ }\NormalTok{num.tasks >}\StringTok{ }\NormalTok{bootstrap.threshold) }\KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'norm.mean'}\NormalTok{) <-}
+\StringTok{      }\NormalTok{job.mean}
+    \NormalTok{if(debug &&}\StringTok{ }\NormalTok{num.tasks >}\StringTok{ }\NormalTok{bootstrap.threshold) }\KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'norm.sd'}\NormalTok{) <-}
+\StringTok{        }\NormalTok{job.sd}
+    \NormalTok{if(debug &&}\StringTok{ }\NormalTok{num.tasks <=}\StringTok{ }\NormalTok{bootstrap.threshold) }\KeywordTok{attr}\NormalTok{(schedule, }\StringTok{'boot.dist'}\NormalTok{) <-}
+\StringTok{      }\NormalTok{boot.dist}
+  
+    \KeywordTok{return} \NormalTok{(schedule)}
+  
+  \NormalTok{\} }\CommentTok{# end function - get.score}
+  
+  
+  
+  \CommentTok{#' Get temperature for current iteration}
+  \CommentTok{#'}
+  \CommentTok{#' @param max.temp Max value of temperature to use (float)}
+  \CommentTok{#' @param max.iter Max number of iterations to search for optimal solution}
+  \CommentTok{#' '(integer)}
+  \CommentTok{#' @param cur.iter Value of current iteration (integer)}
+  \CommentTok{#' @param method Method used to decrease temperature.}
+  \CommentTok{#' Currently only linear decrease of temperature with iteration is supported}
+  \CommentTok{#' @return Value of temperture for the current iteration (integer)}
+  \CommentTok{#' @export}
+  \CommentTok{#' @examples}
+  \CommentTok{#' temp <- get.temperature(25, 100, 7)}
+  \NormalTok{get.temperature <-}\StringTok{ }\NormalTok{function (max.temp, max.iter, cur.iter, }\DataTypeTok{method=}\StringTok{'linear'}\NormalTok{) \{}
+  
+    \CommentTok{# Validate args}
+    \KeywordTok{.check.if.positive.real}\NormalTok{(max.temp)}
+    \KeywordTok{length}\NormalTok{(max.temp) ==}\StringTok{ }\DecValTok{1} \NormalTok{||}
+\StringTok{      }\KeywordTok{stop}\NormalTok{(}\StringTok{"Invalid argument length: max.temp must be a single +ve real number"}\NormalTok{)}
+    \KeywordTok{.check.if.positive.integer}\NormalTok{(max.iter)}
+    \KeywordTok{.check.if.nonnegative.integer}\NormalTok{(cur.iter)}
+    \NormalTok{cur.iter <}\StringTok{ }\NormalTok{max.iter ||}
+\StringTok{      }\KeywordTok{stop}\NormalTok{(}\StringTok{'Invalid argument: cur.iter '}\NormalTok{, cur.iter, }\StringTok{' is >= max.iter '}\NormalTok{, max.iter)}
+  
+    \NormalTok{if (method==}\StringTok{'linear'}\NormalTok{) \{}
+      \NormalTok{temp <-}\StringTok{ }\KeywordTok{.get.temperature.linear.decrease}\NormalTok{(max.temp, max.iter, cur.iter)}
+    \NormalTok{\} else \{}
+      \KeywordTok{stop}\NormalTok{(}\StringTok{'Invalid argument: '}\NormalTok{, method,}
+        \StringTok{' method of decreasing temperature is invalid!'}\NormalTok{)}
+    \NormalTok{\}}\CommentTok{# end if - linear decrease in temp?}
+  
+    \KeywordTok{return} \NormalTok{(temp)}
+  
+  \NormalTok{\} }\CommentTok{# end function - get.temperature}
+  
+  
+  
+  \CommentTok{#' Find optimal schedule}
+  \CommentTok{#'}
+  \CommentTok{#' Want an schedule with >= .95 probability of completing job by the deadline}
+  \CommentTok{#' with the lowest makespan (cost)}
+  \CommentTok{#'}
+  \CommentTok{#' @param job Array of integers representing sizes of tasks in job}
+  \CommentTok{#' @param deadline Time (in seconds) by which job must be completed (integer)}
+  \CommentTok{#' @param cluster.instance.type Instance type of cluster (string).}
+  \CommentTok{#' All instances in the cluster are assumed to have the same instance type}
+  \CommentTok{#' @param cluster.size Integer representing the number of instances}
+  \CommentTok{#' in the cluster}
+  \CommentTok{#' @param max.iter Max number of iterations to use to find the optimal}
+  \CommentTok{#' schedule (integer)}
+  \CommentTok{#' @param max.temp Max temperature to use in the simulated annealing}
+  \CommentTok{#' process (flaot)}
+  \CommentTok{#' @param reset.score.pct Begin next iteration from the best schedule if the}
+  \CommentTok{#' difference between the best score and best score is more than this value}
+  \CommentTok{#' @param reset.num.iters Begin next iteration from the best schedule if the}
+  \CommentTok{#' number of iterations the score has not been increasing exceeds this value}
+  \CommentTok{#' @param debug Print debug info}
+  \CommentTok{#' @return A list representing the optimal schedule that could be found under}
+  \CommentTok{#' the given constraints}
+  \CommentTok{#' @export}
+  \CommentTok{#' @examples}
+  \CommentTok{#' job <- c(1,60,100)}
+  \CommentTok{#' deadline <- 300}
+  \CommentTok{#' cluster.instance.type <- 'm3xlarge'}
+  \CommentTok{#' cluster.size <- 2}
+  \CommentTok{#' max.iter <- 2}
+  \CommentTok{#' max.temp <- 0.5}
+  \CommentTok{#' data(m3xlarge.runtimes.expdist)}
+  \CommentTok{#' setup.trainingset.runtimes('m3xlarge', m3xlarge.runtimes.expdist)}
+  \CommentTok{#' best.schedule <- schedule(job, deadline, cluster.instance.type,}
+  \CommentTok{#' cluster.size, max.iter, max.temp)}
+  \NormalTok{schedule <-}\StringTok{ }\NormalTok{function (job, deadline, cluster.instance.type, cluster.size,}
+      \NormalTok{max.iter, max.temp, }\DataTypeTok{reset.score.pct=}\OtherTok{NULL}\NormalTok{, }\DataTypeTok{reset.num.iters=}\OtherTok{NULL}\NormalTok{, }\DataTypeTok{debug=}\OtherTok{FALSE}\NormalTok{)}
+  \NormalTok{\{}
+  
+    \NormalTok{start.time <-}\StringTok{ }\KeywordTok{proc.time}\NormalTok{()}
+  
+    \NormalTok{if (!}\KeywordTok{is.null}\NormalTok{(reset.score.pct)) }\KeywordTok{.check.if.positive.real}\NormalTok{(reset.score.pct)}
+    \NormalTok{if (!}\KeywordTok{is.null}\NormalTok{(reset.num.iters)) }\KeywordTok{.check.if.positive.integer}\NormalTok{(reset.num.iters)}
+  
+  
+    \NormalTok{runtimes <-}\StringTok{ }\KeywordTok{.get.trainingset.runtimes}\NormalTok{(cluster.instance.type)}
+    \NormalTok{runtimes.summary <-}
+\StringTok{      }\KeywordTok{.get.trainingset.runtimes}\NormalTok{(cluster.instance.type, }\DataTypeTok{summary=}\NormalTok{T)}
+  
+    \NormalTok{cur.schedule <-}\StringTok{ }\KeywordTok{get.initial.schedule}\NormalTok{(cluster.size, job)}
+    \NormalTok{cur.schedule <-}
+\StringTok{      }\KeywordTok{get.score}\NormalTok{(cur.schedule, runtimes, runtimes.summary, deadline)}
+  
+    \NormalTok{best.schedule <-}\StringTok{ }\NormalTok{cur.schedule}
+    \NormalTok{best.processing.cost <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(best.schedule, }\StringTok{'processing.cost'}\NormalTok{)}
+  
+    \NormalTok{if (debug) \{}
+      \NormalTok{output.prefix <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(cluster.size, }\StringTok{'-inst-'}\NormalTok{, }\KeywordTok{length}\NormalTok{(job), }\StringTok{'-tasks-'}\NormalTok{,}
+        \NormalTok{max.iter, }\StringTok{'-SAiter-'}\NormalTok{, num.bootstrap.reps, }\StringTok{'-BSreps'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+      \NormalTok{filename <-}\StringTok{ }\NormalTok{filename <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(output.prefix, }\StringTok{'.output.txt'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+      \KeywordTok{sink}\NormalTok{(filename)}
+    \NormalTok{\}}
+  
+    \NormalTok{if (debug) }\KeywordTok{cat}\NormalTok{(}\StringTok{'best processing.cost='}\NormalTok{, best.processing.cost, }\StringTok{'}\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+  
+    \NormalTok{if (debug) \{}
+      \NormalTok{processing.cost.timeseries <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\DataTypeTok{nrow=}\NormalTok{(max.iter)+}\DecValTok{1}\NormalTok{, }\DataTypeTok{ncol=}\DecValTok{7}\NormalTok{)}
+      \KeywordTok{colnames}\NormalTok{(processing.cost.timeseries) <-}
+\StringTok{        }\KeywordTok{c}\NormalTok{(}\StringTok{'Iter'}\NormalTok{, }\KeywordTok{paste}\NormalTok{(}\StringTok{'Acpt_'}\NormalTok{, deadline, }\StringTok{'s'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\StringTok{'Acpt_95%'}\NormalTok{, }\StringTok{'Acpt_99%'}\NormalTok{,}
+        \KeywordTok{paste}\NormalTok{(}\StringTok{'Best_'}\NormalTok{, deadline, }\StringTok{'s'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\StringTok{'Best_95%'}\NormalTok{, }\StringTok{'Best_99%'}\NormalTok{)}
+  
+      \NormalTok{processing.cost.timeseries[}\DecValTok{1}\NormalTok{,}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\DecValTok{1}
+  
+      \NormalTok{processing.cost.timeseries[}\DecValTok{1}\NormalTok{,}\DecValTok{2}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(cur.schedule, }\StringTok{'score'}\NormalTok{)}
+      \NormalTok{processing.cost.timeseries[}\DecValTok{1}\NormalTok{,}\DecValTok{3}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(cur.schedule, }\StringTok{'runtime95pct'}\NormalTok{)}
+      \NormalTok{processing.cost.timeseries[}\DecValTok{1}\NormalTok{,}\DecValTok{4}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(cur.schedule, }\StringTok{'runtime99pct'}\NormalTok{)}
+  
+      \NormalTok{processing.cost.timeseries[}\DecValTok{1}\NormalTok{,}\DecValTok{5}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(best.schedule, }\StringTok{'score'}\NormalTok{)}
+      \NormalTok{processing.cost.timeseries[}\DecValTok{1}\NormalTok{,}\DecValTok{6}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(best.schedule, }\StringTok{'runtime95pct'}\NormalTok{)}
+      \NormalTok{processing.cost.timeseries[}\DecValTok{1}\NormalTok{,}\DecValTok{7}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(best.schedule, }\StringTok{'runtime99pct'}\NormalTok{)}
+  
+      \NormalTok{filename.ts <-}\StringTok{ }\KeywordTok{paste}\NormalTok{(output.prefix, }\StringTok{'-scores-timeseries.csv'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+      \NormalTok{conn <-}\StringTok{ }\KeywordTok{file}\NormalTok{(filename.ts, }\DataTypeTok{open=}\StringTok{'wt'}\NormalTok{)}
+        \KeywordTok{writeLines}\NormalTok{(}\StringTok{'# Input Params'}\NormalTok{, }\DataTypeTok{con=}\NormalTok{conn)}
+        \KeywordTok{writeLines}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'# job.array = '}\NormalTok{, }\KeywordTok{paste}\NormalTok{(job, }\DataTypeTok{collapse=}\StringTok{';'}\NormalTok{), }\DataTypeTok{sep=}\StringTok{''}\NormalTok{),}
+          \DataTypeTok{con=}\NormalTok{conn)}
+        \KeywordTok{writeLines}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'# num.jobs = '}\NormalTok{, }\KeywordTok{length}\NormalTok{(job), }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\DataTypeTok{con=}\NormalTok{conn)}
+        \KeywordTok{writeLines}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'# deadline = '}\NormalTok{, deadline, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\DataTypeTok{con=}\NormalTok{conn)}
+        \KeywordTok{writeLines}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'# cluster.instance.type = '}\NormalTok{,}
+          \NormalTok{cluster.instance.type, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\DataTypeTok{con=}\NormalTok{conn)}
+        \KeywordTok{writeLines}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'# cluster.size = '}\NormalTok{, cluster.size, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\DataTypeTok{con=}\NormalTok{conn)}
+        \KeywordTok{writeLines}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'# max.iter = '}\NormalTok{, max.iter, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\DataTypeTok{con=}\NormalTok{conn)}
+        \KeywordTok{writeLines}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'# max.temp = '}\NormalTok{, max.temp, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\DataTypeTok{con=}\NormalTok{conn)}
+        \KeywordTok{writeLines}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'# reset.score.pct = '}\NormalTok{, }\KeywordTok{ifelse}\NormalTok{(}\KeywordTok{is.null}\NormalTok{(reset.score.pct),}
+          \StringTok{'NULL'}\NormalTok{, reset.score.pct), }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\DataTypeTok{con=}\NormalTok{conn)}
+        \KeywordTok{writeLines}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'# reset.num.iters = '}\NormalTok{, }\KeywordTok{ifelse}\NormalTok{(}\KeywordTok{is.null}\NormalTok{(reset.num.iters),}
+          \StringTok{'NULL'}\NormalTok{, reset.num.iters), }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\DataTypeTok{con=}\NormalTok{conn)}
+        \KeywordTok{writeLines}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'# debug = '}\NormalTok{, debug, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{), }\DataTypeTok{con=}\NormalTok{conn)}
+  
+        \KeywordTok{write.table}\NormalTok{(}\KeywordTok{t}\NormalTok{(processing.cost.timeseries[}\DecValTok{1}\NormalTok{,]), }\DataTypeTok{file=}\NormalTok{conn, }\DataTypeTok{sep=}\StringTok{','}\NormalTok{, }\DataTypeTok{quote=}\OtherTok{FALSE}\NormalTok{,}
+          \DataTypeTok{row.names=}\OtherTok{FALSE}\NormalTok{)}
+        \KeywordTok{flush}\NormalTok{(conn)}
+    \NormalTok{\} }\CommentTok{# end if - debug?}
+  
+  
+    \CommentTok{# go from 0 to 1 less than max.iter}
+    \CommentTok{# so we start at max temp and end just above 0 and avoid divide-by-zero errors}
+    \NormalTok{for (i in }\DecValTok{0}\NormalTok{:(max.iter}\DecValTok{-1}\NormalTok{)) \{}
+  
+      \NormalTok{if (debug) }\KeywordTok{cat}\NormalTok{(}\StringTok{'}\CharTok{\textbackslash{}n\textbackslash{}n}\StringTok{==========}\CharTok{\textbackslash{}n}\StringTok{SA iter: '}\NormalTok{, i, }\StringTok{' ('}\NormalTok{, (i}\DecValTok{+2}\NormalTok{), }\StringTok{') }\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{,}
+        \StringTok{'==========}\CharTok{\textbackslash{}n\textbackslash{}n}\StringTok{'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+  
+        \NormalTok{proposed.schedule <-}\StringTok{ }\KeywordTok{get.neighbor}\NormalTok{(cur.schedule)}
+        \NormalTok{cur.schedule <-}\StringTok{ }\KeywordTok{compare.schedules}\NormalTok{(cur.schedule, proposed.schedule,}
+          \NormalTok{runtimes, runtimes.summary, deadline, max.temp, max.iter, i)}
+      \NormalTok{cur.processing.cost <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(cur.schedule, }\StringTok{'processing.cost'}\NormalTok{)}
+  
+      \CommentTok{# update best score, if necessary}
+      \NormalTok{if (cur.processing.cost <}\StringTok{ }\NormalTok{best.processing.cost) \{}
+        \NormalTok{best.schedule <-}\StringTok{ }\NormalTok{cur.schedule}
+        \NormalTok{best.processing.cost <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(best.schedule, }\StringTok{'processing.cost'}\NormalTok{)}
+      \NormalTok{\} }\CommentTok{# end if - cur schedule better than best schedule so far?}
+  
+      \NormalTok{if (debug) }\KeywordTok{cat}\NormalTok{(}\StringTok{'best processing.cost='}\NormalTok{, best.processing.cost, }\StringTok{'}\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+  
+      \CommentTok{# restart from current best schedule if score of current schedule}
+      \CommentTok{# is too low}
+      \NormalTok{if (!}\KeywordTok{is.null}\NormalTok{(reset.score.pct)) \{}
+        \NormalTok{d <-}\StringTok{ }\NormalTok{(cur.processing.cost -}\StringTok{ }\NormalTok{best.processing.cost)}
+        \NormalTok{d.pct <-}\StringTok{ }\DecValTok{100}\NormalTok{*d/best.processing.cost}
+        \NormalTok{if (d.pct >}\StringTok{ }\NormalTok{reset.score.pct) \{}
+          \NormalTok{cur.schedule <-}\StringTok{ }\NormalTok{best.schedule}
+          \NormalTok{if (debug) }\KeywordTok{cat}\NormalTok{(}\StringTok{'Resetting current schedule to best schedule since}
+\StringTok{            d.pct='}\NormalTok{, d.pct, }\StringTok{'. Best processing.cost so far = '}\NormalTok{, best.processing.cost, }\StringTok{'}\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{, }\DataTypeTok{sep=}\StringTok{''}\NormalTok{)}
+        \NormalTok{\} }\CommentTok{# end if - reset current schedule to best schedule}
+      \NormalTok{\} }\CommentTok{# end if - reset.score.pct defined?}
+  
+  
+  
+      \NormalTok{if (debug) \{}
+        \NormalTok{processing.cost.timeseries[(i}\DecValTok{+2}\NormalTok{),}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\NormalTok{(i}\DecValTok{+2}\NormalTok{)}
+  
+        \NormalTok{processing.cost.timeseries[(i}\DecValTok{+2}\NormalTok{),}\DecValTok{2}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(cur.schedule, }\StringTok{'processing.cost'}\NormalTok{)}
+        \NormalTok{processing.cost.timeseries[(i}\DecValTok{+2}\NormalTok{),}\DecValTok{3}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(cur.schedule, }\StringTok{'runtime95pct'}\NormalTok{)}
+        \NormalTok{processing.cost.timeseries[(i}\DecValTok{+2}\NormalTok{),}\DecValTok{4}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(cur.schedule, }\StringTok{'runtime99pct'}\NormalTok{)}
+  
+        \NormalTok{processing.cost.timeseries[(i}\DecValTok{+2}\NormalTok{),}\DecValTok{5}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(best.schedule, }\StringTok{'processing.cost'}\NormalTok{)}
+        \NormalTok{processing.cost.timeseries[(i}\DecValTok{+2}\NormalTok{),}\DecValTok{6}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(best.schedule, }\StringTok{'runtime95pct'}\NormalTok{)}
+        \NormalTok{processing.cost.timeseries[(i}\DecValTok{+2}\NormalTok{),}\DecValTok{7}\NormalTok{] <-}\StringTok{ }\KeywordTok{attr}\NormalTok{(best.schedule, }\StringTok{'runtime99pct'}\NormalTok{)}
+  
+        \KeywordTok{write.table}\NormalTok{(}\KeywordTok{t}\NormalTok{(processing.cost.timeseries[(i}\DecValTok{+2}\NormalTok{),]), }\DataTypeTok{file=}\NormalTok{conn, }\DataTypeTok{sep=}\StringTok{','}\NormalTok{, }\DataTypeTok{quote=}\OtherTok{FALSE}\NormalTok{,}
+          \DataTypeTok{row.names=}\OtherTok{FALSE}\NormalTok{, }\DataTypeTok{col.names=}\OtherTok{FALSE}\NormalTok{, }\DataTypeTok{append=}\OtherTok{TRUE}\NormalTok{)}
+        \KeywordTok{flush}\NormalTok{(conn)}
+      \NormalTok{\} }\CommentTok{# end if - debug?}
+  
+    \NormalTok{\} }\CommentTok{# end for - loop over all iterations}
+  
+  
+    \CommentTok{# sort task.sizes in each instance}
+    \CommentTok{# for (i in 1:length(best.schedule)) \{}
+    \CommentTok{#   best.schedule[[i]] <- sort(best.schedule[[i]], decreasing=TRUE, na.last=NA)}
+    \CommentTok{# \} # end for - loop over all instance}
+  
+    \NormalTok{if (debug) }\KeywordTok{attr}\NormalTok{(best.schedule, }\StringTok{'scores.ts'}\NormalTok{) <-}\StringTok{ }\NormalTok{processing.cost.timeseries}
+  
+    \KeywordTok{cat}\NormalTok{(}\StringTok{'}\CharTok{\textbackslash{}n}\StringTok{Best processing.cost: '}\NormalTok{, }\KeywordTok{attr}\NormalTok{(best.schedule, }\StringTok{'processing.cost'}\NormalTok{), }\StringTok{'}\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+    \KeywordTok{cat}\NormalTok{(}\StringTok{'Best schedule: }\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{)}
+    \KeywordTok{print}\NormalTok{(best.schedule)}
+    \KeywordTok{cat}\NormalTok{(}\StringTok{'}\CharTok{\textbackslash{}n\textbackslash{}n}\StringTok{'}\NormalTok{)}
+  
+    \NormalTok{d <-}\StringTok{ }\KeywordTok{proc.time}\NormalTok{()-start.time}
+    \KeywordTok{cat}\NormalTok{(}\StringTok{'Time taken: '}\NormalTok{, d[}\DecValTok{3}\NormalTok{], }\StringTok{' seconds'}\NormalTok{)}
+  
+    \NormalTok{if (debug)  \{}
+      \KeywordTok{sink}\NormalTok{()}
+      \KeywordTok{close}\NormalTok{(conn)}
+    \NormalTok{\} }\CommentTok{# end if - debug?}
+  
+    \KeywordTok{return} \NormalTok{(best.schedule)}
+  
+  \NormalTok{\} }\CommentTok{# end function - schedule}
+\end{Highlighting}
+\end{Shaded}
+
